@@ -176,6 +176,7 @@ CStdString CDatabase::PrepareSQL(CStdString strStmt, ...) const
 std::string CDatabase::GetSingleValue(const std::string &query, std::auto_ptr<Dataset> &ds)
 {
   std::string ret;
+//  CLog::Log(LOGERROR, "%s  query:  %s",__FUNCTION__, query);
   try
   {
     if (!m_pDB.get() || !ds.get())
@@ -485,13 +486,12 @@ bool CDatabase::Connect(const CStdString &dbName, const DatabaseSettings &dbSett
         //  database file to 4k.
         //  This needs to be done before any table is created.
         m_pDS->exec("PRAGMA page_size=4096\n");
-
         //  Also set the memory cache size to 16k
         m_pDS->exec("PRAGMA default_cache_size=4096\n");
       }
       CreateTables();
     }
-
+    generateTVShowView();
     // sqlite3 post connection operations
     if (dbSettings.type.Equals("sqlite3"))
     {

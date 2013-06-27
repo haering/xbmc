@@ -33,6 +33,7 @@
 #include "video/VideoDatabase.h"
 #include "Util.h"
 #include "XBDateTime.h"
+#include "settings\AdvancedSettings.h"
 #include "guilib/LocalizeStrings.h"
 
 using namespace std;
@@ -756,10 +757,10 @@ CStdString CSmartPlaylistRule::GetWhereClause(const CDatabase &db, const CStdStr
     else if (strType == "tvshows")
     {
       if (m_field == FieldInProgress)
-        return GetField(FieldId, strType) + negate + " IN (select " + GetField(FieldId, strType) + " from tvshowview where "
+        return GetField(FieldId, strType) + negate + " IN (select " + GetField(FieldId, strType) + " from tvshowview"+ g_advancedSettings.m_databaseVideo.userID+" tvshowview where "
                "(watchedcount > 0 AND watchedcount < totalCount) OR "
                "(watchedcount = 0 AND " + GetField(FieldId, strType) + " IN "
-               "(select episodeview.idShow from episodeview WHERE episodeview.idShow = " + GetField(FieldId, strType) + " AND episodeview.resumeTimeInSeconds > 0)))";
+               "(select episodeview.idShow from "+CVideoDatabase::episodeView+" WHERE episodeview.idShow = " + GetField(FieldId, strType) + " AND episodeview.resumeTimeInSeconds > 0)))";
     }
   }
 
@@ -850,7 +851,7 @@ CStdString CSmartPlaylistRule::GetWhereClause(const CDatabase &db, const CStdStr
     }
     else if (strType == "movies")
     {
-      table = "movieview";
+      table = CVideoDatabase::movieView;
 
       if (m_field == FieldGenre)
         query = GetField(FieldId, strType) + negate + " IN (SELECT idMovie FROM genrelinkmovie JOIN genre ON genre.idGenre=genrelinkmovie.idGenre WHERE genre.strGenre" + parameter + ")";
@@ -871,7 +872,7 @@ CStdString CSmartPlaylistRule::GetWhereClause(const CDatabase &db, const CStdStr
     }
     else if (strType == "musicvideos")
     {
-      table = "musicvideoview";
+      table = CVideoDatabase::musicVideoView;
 
       if (m_field == FieldGenre)
         query = GetField(FieldId, strType) + negate + " IN (SELECT idMVideo FROM genrelinkmusicvideo JOIN genre ON genre.idGenre=genrelinkmusicvideo.idGenre WHERE genre.strGenre" + parameter + ")";
@@ -886,7 +887,7 @@ CStdString CSmartPlaylistRule::GetWhereClause(const CDatabase &db, const CStdStr
     }
     else if (strType == "tvshows")
     {
-      table = "tvshowview";
+      table = CVideoDatabase::tvShowView;
 
       if (m_field == FieldGenre)
         query = GetField(FieldId, strType) + negate + " IN (SELECT idShow FROM genrelinktvshow JOIN genre ON genre.idGenre=genrelinktvshow.idGenre WHERE genre.strGenre" + parameter + ")";
@@ -895,9 +896,9 @@ CStdString CSmartPlaylistRule::GetWhereClause(const CDatabase &db, const CStdStr
       else if (m_field == FieldActor)
         query = GetField(FieldId, strType) + negate + " IN (SELECT idShow FROM actorlinktvshow JOIN actors ON actors.idActor=actorlinktvshow.idActor WHERE actors.strActor" + parameter + ")";
       else if (m_field == FieldStudio)
-        query = GetField(FieldId, strType) + negate + " IN (SELECT idShow FROM tvshowview WHERE " + GetField(m_field, strType) + parameter + ")";
+        query = GetField(FieldId, strType) + negate + " IN (SELECT idShow FROM "+CVideoDatabase::tvShowView+" WHERE " + GetField(m_field, strType) + parameter + ")";
       else if (m_field == FieldMPAA)
-        query = GetField(FieldId, strType) + negate + " IN (SELECT idShow FROM tvshowview WHERE " + GetField(m_field, strType) + parameter + ")";
+        query = GetField(FieldId, strType) + negate + " IN (SELECT idShow FROM "+CVideoDatabase::tvShowView+" WHERE " + GetField(m_field, strType) + parameter + ")";
       else if ((m_field == FieldLastPlayed || m_field == FieldDateAdded) && (m_operator == OPERATOR_LESS_THAN || m_operator == OPERATOR_BEFORE || m_operator == OPERATOR_NOT_IN_THE_LAST))
         query = GetField(m_field, strType) + " IS NULL OR " + GetField(m_field, strType) + parameter;
       else if (m_field == FieldPlaycount)
@@ -905,7 +906,7 @@ CStdString CSmartPlaylistRule::GetWhereClause(const CDatabase &db, const CStdStr
     }
     else if (strType == "episodes")
     {
-      table = "episodeview";
+      table = CVideoDatabase::episodeView;
 
       if (m_field == FieldGenre)
         query = table + ".idShow" + negate + " IN (SELECT idShow FROM genrelinktvshow JOIN genre ON genre.idGenre=genrelinktvshow.idGenre WHERE genre.strGenre" + parameter + ")";
@@ -918,9 +919,9 @@ CStdString CSmartPlaylistRule::GetWhereClause(const CDatabase &db, const CStdStr
       else if ((m_field == FieldLastPlayed || m_field == FieldDateAdded) && (m_operator == OPERATOR_LESS_THAN || m_operator == OPERATOR_BEFORE || m_operator == OPERATOR_NOT_IN_THE_LAST))
         query = GetField(m_field, strType) + " IS NULL OR " + GetField(m_field, strType) + parameter;
       else if (m_field == FieldStudio)
-        query = GetField(FieldId, strType) + negate + " IN (SELECT idEpisode FROM episodeview WHERE strStudio" + parameter + ")";
+        query = GetField(FieldId, strType) + negate + " IN (SELECT idEpisode FROM "+CVideoDatabase::episodeView+" WHERE strStudio" + parameter + ")";
       else if (m_field == FieldMPAA)
-        query = GetField(FieldId, strType) + negate + " IN (SELECT idEpisode FROM episodeview WHERE mpaa" + parameter + ")";
+        query = GetField(FieldId, strType) + negate + " IN (SELECT idEpisode FROM "+CVideoDatabase::episodeView+" WHERE mpaa" + parameter + ")";
     }
     if (m_field == FieldVideoResolution)
       query = table + ".idFile" + negate + GetVideoResolutionQuery(*it);

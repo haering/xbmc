@@ -340,14 +340,14 @@ bool CRecentlyAddedJob::UpdateTotal()
   musicdatabase.Close();
  
   videodatabase.Open();
-  int tvShowCount     = atoi(videodatabase.GetSingleValue("tvshowview"     , "count(1)"));
-  int movieTotals     = atoi(videodatabase.GetSingleValue("movieview"      , "count(1)"));
-  int movieWatched    = atoi(videodatabase.GetSingleValue("movieview"      , "count(playCount)"));
-  int MusVidTotals    = atoi(videodatabase.GetSingleValue("musicvideoview" , "count(1)"));
-  int MusVidWatched   = atoi(videodatabase.GetSingleValue("musicvideoview" , "count(playCount)"));
-  int EpWatched       = atoi(videodatabase.GetSingleValue("tvshowview"     , "sum(watchedcount)"));
-  int EpCount         = atoi(videodatabase.GetSingleValue("tvshowview"     , "sum(totalcount)"));
-  int TvShowsWatched  = atoi(videodatabase.GetSingleValue("tvshowview"     , "sum(watchedcount = totalcount)"));
+  int tvShowCount     = atoi(videodatabase.GetSingleValue(CVideoDatabase::tvShowView     , "count(1)"));
+  int movieTotals     = atoi(videodatabase.GetSingleValue(CVideoDatabase::movieView      , "count(1)"));
+  int movieWatched    = atoi(videodatabase.GetSingleValue(CVideoDatabase::movieView  , "count(playCount)"));
+  int MusVidTotals    = atoi(videodatabase.GetSingleValue(CVideoDatabase::musicVideoView , "count(1)"));
+  int MusVidWatched   = atoi(videodatabase.GetSingleValue(CVideoDatabase::musicVideoView , "count(playCount)"));
+  int EpWatched       = atoi(videodatabase.GetSingleValue(CVideoDatabase::tvShowView     , "sum(watchedcount)"));
+  int EpCount         = atoi(videodatabase.GetSingleValue(CVideoDatabase::tvShowView    , "sum(totalcount)"));
+  int TvShowsWatched  = atoi(videodatabase.GetSingleValue(CVideoDatabase::tvShowView    , "sum(watchedcount = totalcount)"));
   videodatabase.Close();
   
   home->SetProperty("TVShows.Count"         , tvShowCount);

@@ -36,6 +36,7 @@ public:
     user.clear();
     pass.clear();
     name.clear();
+    userID.clear();
   };
   CStdString type;
   CStdString host;
@@ -43,6 +44,7 @@ public:
   CStdString user;
   CStdString pass;
   CStdString name;
+  CStdString userID;
 };
 
 struct TVShowRegexp

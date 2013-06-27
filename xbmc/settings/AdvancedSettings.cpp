@@ -1002,6 +1002,7 @@ void CAdvancedSettings::ParseSettingsFile(const CStdString &file)
     XMLUtils::GetString(pDatabase, "user", m_databaseVideo.user);
     XMLUtils::GetString(pDatabase, "pass", m_databaseVideo.pass);
     XMLUtils::GetString(pDatabase, "name", m_databaseVideo.name);
+    XMLUtils::GetString(pDatabase, "userID", m_databaseVideo.userID);
   }
 
   pDatabase = pRootElement->FirstChildElement("musicdatabase");

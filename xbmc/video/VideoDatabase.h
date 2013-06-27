@@ -65,10 +65,13 @@ namespace VIDEO
   struct SScanSettings;
 }
 
+#define COUNT_WATCHLIST_PLAYCOUNT "count(watchlist.playCount)"
+
 // these defines are based on how many columns we have and which column certain data is going to be in
 // when we do GetDetailsForMovie()
 #define VIDEODB_MAX_COLUMNS 24
 #define VIDEODB_DETAILS_FILEID			1
+
 
 #define VIDEODB_DETAILS_MOVIE_SET_ID			VIDEODB_MAX_COLUMNS + 2
 #define VIDEODB_DETAILS_MOVIE_SET_NAME		VIDEODB_MAX_COLUMNS + 3
@@ -334,6 +337,12 @@ const struct SDbTableOffsets DbMusicVideoOffsets[] =
 class CVideoDatabase : public CDatabase
 {
 public:
+	static CStdString movieView;
+	static CStdString musicVideoView;
+	static CStdString tvShowView;
+	static CStdString episodeView;
+//	static CStdString musicVideoView;
+//	static CStdString movieView;
 
   class CActor    // used for actor retrieval for non-master users
   {
@@ -767,6 +776,9 @@ protected:
   CStdString GetValueString(const CVideoInfoTag &details, int min, int max, const SDbTableOffsets *offsets) const;
 
 private:
+
+  static bool createdTVShowView;
+
   virtual bool CreateTables();
   virtual bool UpdateOldVersion(int version);
 
@@ -774,6 +786,8 @@ private:
      episodes and music videos
    */
   virtual void CreateViews();
+
+  virtual void generateTVShowView();
 
   /*! \brief Run a query on the main dataset and return the number of rows
    If no rows are found we close the dataset and return 0.
