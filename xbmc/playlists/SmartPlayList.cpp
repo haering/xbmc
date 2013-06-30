@@ -33,7 +33,7 @@
 #include "video/VideoDatabase.h"
 #include "Util.h"
 #include "XBDateTime.h"
-#include "settings\AdvancedSettings.h"
+#include "settings/AdvancedSettings.h"
 #include "guilib/LocalizeStrings.h"
 
 using namespace std;
