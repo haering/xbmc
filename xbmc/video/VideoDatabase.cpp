@@ -397,7 +397,8 @@ void CVideoDatabase::generateTVShowView() {
 	if(!g_advancedSettings.Initialized() || CVideoDatabase::createdTVShowView)
 		return;
 	CVideoDatabase::createdTVShowView = true;
-	CStdString tvshowview = PrepareSQL("CREATE OR REPLACE VIEW tvshowview"+g_advancedSettings.m_databaseVideo.userID+" AS SELECT "
+	m_pDS->exec("DROP VIEW IF EXISTS tvshowview"+g_advancedSettings.m_databaseVideo.userID);
+	CStdString tvshowview = PrepareSQL("CREATE VIEW tvshowview"+g_advancedSettings.m_databaseVideo.userID+" AS SELECT "
 	                                     "  tvshow.*,"
 	                                     "  path.strPath AS strPath,"
 	                                     "  path.dateAdded AS dateAdded,"
@@ -420,8 +421,8 @@ void CVideoDatabase::generateTVShowView() {
 	  m_pDS->exec(tvshowview.c_str());
 
 	  CLog::Log(LOGINFO, "create episodeview");
-//	   m_pDS->exec("DROP VIEW IF EXISTS episodeview");
-	   CStdString episodeview = PrepareSQL("CREATE  OR REPLACE  VIEW episodeview"+g_advancedSettings.m_databaseVideo.userID+" AS SELECT "
+	  m_pDS->exec("DROP VIEW IF EXISTS episodeview"+g_advancedSettings.m_databaseVideo.userID);
+	   CStdString episodeview = PrepareSQL("CREATE  VIEW episodeview"+g_advancedSettings.m_databaseVideo.userID+" AS SELECT "
 	                                       "  episode.*,"
 	                                       "  files.strFileName AS strFileName,"
 	                                       "  path.strPath AS strPath,"
@@ -476,8 +477,8 @@ void CVideoDatabase::generateTVShowView() {
 	 //  m_pDS->exec(tvshowview.c_str());
 
 	   CLog::Log(LOGINFO, "create musicvideoview");
-//	   m_pDS->exec("DROP VIEW IF EXISTS musicvideoview");
-	   m_pDS->exec("CREATE  OR REPLACE  VIEW musicvideoview"+g_advancedSettings.m_databaseVideo.userID+" AS SELECT"
+	   m_pDS->exec("DROP VIEW IF EXISTS musicvideoview"+g_advancedSettings.m_databaseVideo.userID);
+	   m_pDS->exec("CREATE VIEW musicvideoview"+g_advancedSettings.m_databaseVideo.userID+" AS SELECT"
 	               "  musicvideo.*,"
 	               "  files.strFileName as strFileName,"
 	               "  path.strPath as strPath,"
@@ -497,8 +498,8 @@ void CVideoDatabase::generateTVShowView() {
 				   "    bookmark.idFile=musicvideo.idFile AND bookmark.type=1 AND bookmark.idViewer =watchList.idViewer ");
 
 	   CLog::Log(LOGINFO, "create movieview");
-//	   m_pDS->exec("DROP VIEW IF EXISTS movieview");
-	   m_pDS->exec("CREATE  OR REPLACE  VIEW movieview"+g_advancedSettings.m_databaseVideo.userID+" AS SELECT"
+	   m_pDS->exec("DROP VIEW IF EXISTS movieview"+g_advancedSettings.m_databaseVideo.userID);
+	   m_pDS->exec("CREATE VIEW movieview"+g_advancedSettings.m_databaseVideo.userID+" AS SELECT"
 	               "  movie.*,"
 	               "  sets.strSet AS strSet,"
 	               "  files.strFileName AS strFileName,"

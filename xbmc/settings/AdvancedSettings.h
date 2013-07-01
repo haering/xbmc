@@ -36,7 +36,7 @@ public:
     user.clear();
     pass.clear();
     name.clear();
-    userID.clear();
+    userID = "1";
   };
   CStdString type;
   CStdString host;
