@@ -5448,7 +5448,7 @@ bool CVideoDatabase::GetYearsNav(const CStdString& strBaseDir, CFileItemList& it
       if (idContent == VIDEODB_CONTENT_MOVIES)
       {
         strSQL = PrepareSQL("select movieview.c%02d, path.strPath, watchlist.playCount from "+CVideoDatabase::movieView+" ", VIDEODB_ID_YEAR);
-        extFilter.AppendJoin(PrepareSQL("join files on files.idFile = movieview.idFile join path on files.idPath = path.idPath LEFT JOIN watchlist ON watchlist.idFile=files.idFile AND watchlist.idViewer = "+ g_advancedSettings.m_databaseVideo.userID));
+        extFilter.AppendJoin(PrepareSQL("join files on files.idFile = movieview.idFile join path on files.idPath = path.idPath LEFT JOIN watchlist ON watchlist.idFile=files.idFile AND watchlist.idViewer = "+ g_advancedSettings.m_databaseVideo.userID +" "));
       }
       else if (idContent == VIDEODB_CONTENT_TVSHOWS)
       {
@@ -5458,7 +5458,7 @@ bool CVideoDatabase::GetYearsNav(const CStdString& strBaseDir, CFileItemList& it
       else if (idContent == VIDEODB_CONTENT_MUSICVIDEOS)
       {
         strSQL = PrepareSQL("select musicvideoview.c%02d, path.strPath, watchlist.playCount from "+CVideoDatabase::movieView+" ", VIDEODB_ID_MUSICVIDEO_YEAR);
-        extFilter.AppendJoin(PrepareSQL("join files on files.idFile = musicvideoview.idFile join path on files.idPath = path.idPath LEFT JOIN watchlist ON watchlist.idFile=files.idFile AND watchlist.idViewer = "+g_advancedSettings.m_databaseVideo.userID));
+        extFilter.AppendJoin(PrepareSQL("join files on files.idFile = musicvideoview.idFile join path on files.idPath = path.idPath LEFT JOIN watchlist ON watchlist.idFile=files.idFile AND watchlist.idViewer = "+g_advancedSettings.m_databaseVideo.userID +" " ));
       }
       else
         return false;
@@ -5469,7 +5469,7 @@ bool CVideoDatabase::GetYearsNav(const CStdString& strBaseDir, CFileItemList& it
       if (idContent == VIDEODB_CONTENT_MOVIES)
       {
         strSQL = PrepareSQL("select movieview.c%02d, count(1), count(watchlist.playCount) from "+CVideoDatabase::movieView+" ", VIDEODB_ID_YEAR);
-        extFilter.AppendJoin(PrepareSQL("join files on files.idFile = movieview.idFile LEFT JOIN watchlist ON watchlist.idFile=files.idFile AND watchlist.idViewer = " +g_advancedSettings.m_databaseVideo.userID));
+        extFilter.AppendJoin(PrepareSQL("join files on files.idFile = movieview.idFile LEFT JOIN watchlist ON watchlist.idFile=files.idFile AND watchlist.idViewer = " +g_advancedSettings.m_databaseVideo.userID +" "));
         extFilter.AppendGroup(PrepareSQL("movieview.c%02d", VIDEODB_ID_YEAR));
       }
       else if (idContent == VIDEODB_CONTENT_TVSHOWS)
@@ -5477,7 +5477,7 @@ bool CVideoDatabase::GetYearsNav(const CStdString& strBaseDir, CFileItemList& it
       else if (idContent == VIDEODB_CONTENT_MUSICVIDEOS)
       {
         strSQL = PrepareSQL("select musicvideoview.c%02d, count(1), count(watchlist.playCount) from "+CVideoDatabase::movieView+" ", VIDEODB_ID_MUSICVIDEO_YEAR);
-        extFilter.AppendJoin(PrepareSQL("join files on files.idFile = musicvideoview.idFile LEFT JOIN watchlist ON watchlist.idFile=files.idFile AND watchlist.idViewer = " + g_advancedSettings.m_databaseVideo.userID));
+        extFilter.AppendJoin(PrepareSQL("join files on files.idFile = musicvideoview.idFile LEFT JOIN watchlist ON watchlist.idFile=files.idFile AND watchlist.idViewer = " + g_advancedSettings.m_databaseVideo.userID +" "));
         extFilter.AppendGroup(PrepareSQL("musicvideoview.c%02d", VIDEODB_ID_MUSICVIDEO_YEAR));
       }
       else
@@ -6341,7 +6341,7 @@ bool CVideoDatabase::GetEpisodesByWhere(const CStdString& strBaseDir, const Filt
 
     int total = -1;
     
-    CStdString strSQL = "select %s from "+CVideoDatabase::episodeView+" LEFT JOIN watchlist ON watchlist.idFile=episodeview.idFile AND watchlist.idViewer =" + g_advancedSettings.m_databaseVideo.userID;
+    CStdString strSQL = "select %s from "+CVideoDatabase::episodeView+"  LEFT JOIN watchlist ON watchlist.idFile=episodeview.idFile AND watchlist.idViewer =" + g_advancedSettings.m_databaseVideo.userID+" ";
     CVideoDbUrl videoUrl;
     CStdString strSQLExtra;
     Filter extFilter = filter;
@@ -7203,7 +7203,7 @@ bool CVideoDatabase::GetMusicVideosByWhere(const CStdString &baseDir, const Filt
 
     int total = -1;
     
-    CStdString strSQL = "select %s from "+CVideoDatabase::musicVideoView+" LEFT JOIN watchlist ON watchlist.idFile=musicvideoview.idFile AND watchlist.idViewer =" + g_advancedSettings.m_databaseVideo.userID;
+    CStdString strSQL = "select %s from "+CVideoDatabase::musicVideoView+" LEFT JOIN watchlist ON watchlist.idFile=musicvideoview.idFile AND watchlist.idViewer =" + g_advancedSettings.m_databaseVideo.userID +" ";
     CVideoDbUrl videoUrl;
     CStdString strSQLExtra;
     Filter extFilter = filter;
