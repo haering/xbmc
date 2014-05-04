@@ -128,8 +128,8 @@ std::string DatabaseUtils::GetField(Field field, const MediaType &mediaType, Dat
     else if (field == FieldTrackNumber) result = StringUtils::Format("musicvideo_view.c%02d", VIDEODB_ID_MUSICVIDEO_TRACK);
     else if (field == FieldFilename) return "musicvideo_view.strFilename";
     else if (field == FieldPath) return "musicvideo_view.strPath";
-    else if (field == FieldPlaycount) return "musicvideo_view.playCount";
-    else if (field == FieldLastPlayed) return "musicvideo_view.lastPlayed";
+    else if (field == FieldPlaycount) return "watchlist.playCount";
+    else if (field == FieldLastPlayed) return "watchlist.lastPlayed";
     else if (field == FieldDateAdded) return "musicvideo_view.dateAdded";
 
     if (!result.empty())
@@ -172,8 +172,8 @@ std::string DatabaseUtils::GetField(Field field, const MediaType &mediaType, Dat
     else if (field == FieldCountry) result = StringUtils::Format("movie_view.c%02d", VIDEODB_ID_COUNTRY);
     else if (field == FieldFilename) return "movie_view.strFilename";
     else if (field == FieldPath) return "movie_view.strPath";
-    else if (field == FieldPlaycount) return "movie_view.playCount";
-    else if (field == FieldLastPlayed) return "movie_view.lastPlayed";
+    else if (field == FieldPlaycount) return "watchlist.playCount";
+    else if (field == FieldLastPlayed) return "watchlist.lastPlayed";
     else if (field == FieldDateAdded) return "movie_view.dateAdded";
 
     if (!result.empty())
@@ -200,12 +200,13 @@ std::string DatabaseUtils::GetField(Field field, const MediaType &mediaType, Dat
     else if (field == FieldMPAA) result = StringUtils::Format("tvshow_view.c%02d", VIDEODB_ID_TV_MPAA);
     else if (field == FieldStudio) result = StringUtils::Format("tvshow_view.c%02d", VIDEODB_ID_TV_STUDIOS);
     else if (field == FieldSortTitle) result = StringUtils::Format("tvshow_view.c%02d", VIDEODB_ID_TV_SORTTITLE);
-    else if (field == FieldPath) return "tvshow_view.strPath";
-    else if (field == FieldDateAdded) return "tvshow_view.dateAdded";
-    else if (field == FieldLastPlayed) return "tvshow_view.lastPlayed";
-    else if (field == FieldSeason) return "tvshow_view.totalSeasons";
-    else if (field == FieldNumberOfEpisodes) return "tvshow_view.totalCount";
-    else if (field == FieldNumberOfWatchedEpisodes) return "tvshow_view.watchedcount";
+	else if (field == FieldPath) return "tvshow_view.strPath";
+	else if (field == FieldDateAdded) return "tvshow_view.dateAdded";
+	else if (field == FieldLastPlayed) return "tvshow_view.lastPlayed";
+	else if (field == FieldSeason) return "tvshow_view.totalSeasons";
+	else if (field == FieldNumberOfEpisodes) return "tvshow_view.totalCount";
+	else if (field == FieldNumberOfWatchedEpisodes) return "tvshow_view.watchedcount";
+
 
     if (!result.empty())
       return result;
@@ -229,8 +230,8 @@ std::string DatabaseUtils::GetField(Field field, const MediaType &mediaType, Dat
     else if (field == FieldSeasonSpecialSort) result = StringUtils::Format("episode_view.c%02d", VIDEODB_ID_EPISODE_SORTSEASON);
     else if (field == FieldFilename) return "episode_view.strFilename";
     else if (field == FieldPath) return "episode_view.strPath";
-    else if (field == FieldPlaycount) return "episode_view.playCount";
-    else if (field == FieldLastPlayed) return "episode_view.lastPlayed";
+    else if (field == FieldPlaycount) return "watchlist.playCount";
+    else if (field == FieldLastPlayed) return "watchlist.lastPlayed";
     else if (field == FieldDateAdded) return "episode_view.dateAdded";
     else if (field == FieldTvShowTitle) return "episode_view.strTitle";
     else if (field == FieldYear) return "episode_view.premiered";

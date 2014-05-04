@@ -1067,6 +1067,7 @@ void CAdvancedSettings::ParseSettingsFile(const std::string &file)
     XMLUtils::GetString(pDatabase, "user", m_databaseVideo.user);
     XMLUtils::GetString(pDatabase, "pass", m_databaseVideo.pass);
     XMLUtils::GetString(pDatabase, "name", m_databaseVideo.name);
+    XMLUtils::GetString(pDatabase, "userID", m_databaseVideo.userID);
     XMLUtils::GetString(pDatabase, "key", m_databaseVideo.key);
     XMLUtils::GetString(pDatabase, "cert", m_databaseVideo.cert);
     XMLUtils::GetString(pDatabase, "ca", m_databaseVideo.ca);
