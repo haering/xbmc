@@ -48,11 +48,13 @@ public:
     ca.clear();
     capath.clear();
     ciphers.clear();
+    userID = "1";
   };
   CStdString type;
   CStdString host;
   CStdString port;
   CStdString user;
+  CStdString userID;
   CStdString pass;
   CStdString name;
   CStdString key;

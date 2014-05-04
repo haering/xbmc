@@ -29,6 +29,7 @@
 #include "threads/Timer.h"
 #include "utils/DatabaseUtils.h"
 #include "utils/StdString.h"
+#include "video/VideoDatabase.h"
 
 class CFileItemList;
 

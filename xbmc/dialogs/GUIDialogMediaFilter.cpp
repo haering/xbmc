@@ -27,6 +27,7 @@
 #include "guilib/LocalizeStrings.h"
 #include "music/MusicDatabase.h"
 #include "playlists/SmartPlayList.h"
+#include "settings/AdvancedSettings.h"
 #include "utils/log.h"
 #include "utils/MathUtils.h"
 #include "utils/StringUtils.h"
@@ -825,17 +826,17 @@ void CGUIDialogMediaFilter::GetRange(const Filter &filter, float &min, float &in
       CStdString year;
       if (m_mediaType == "movies")
       {
-        table = "movieview";
+    	table = CVideoDatabase::movieView;
         year = DatabaseUtils::GetField(FieldYear, MediaTypeMovie, DatabaseQueryPartWhere);
       }
       else if (m_mediaType == "tvshows")
       {
-        table = "tvshowview";
+        table = CVideoDatabase::tvShowView;
         year = StringUtils::Format("strftime(\"%%Y\", %s)", DatabaseUtils::GetField(FieldYear, MediaTypeTvShow, DatabaseQueryPartWhere).c_str());
       }
       else if (m_mediaType == "musicvideos")
       {
-        table = "musicvideoview";
+    	table = CVideoDatabase::musicVideoView;
         year = DatabaseUtils::GetField(FieldYear, MediaTypeMusicVideo, DatabaseQueryPartWhere);
       }
 
@@ -876,7 +877,7 @@ void CGUIDialogMediaFilter::GetRange(const Filter &filter, float &min, float &in
     {
       CStdString field = StringUtils::Format("CAST(strftime(\"%%s\", c%02d) AS INTEGER)", VIDEODB_ID_EPISODE_AIRED);
       
-      GetMinMax("episodeview", field, min, max);
+      GetMinMax(CVideoDatabase::episodeView, field, min, max);
       interval = 60 * 60 * 24 * 7; // 1 week
     }
   }

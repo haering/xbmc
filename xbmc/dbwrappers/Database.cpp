@@ -492,6 +492,7 @@ bool CDatabase::Connect(const CStdString &dbName, const DatabaseSettings &dbSett
       }
       CreateDatabase();
     }
+    generateViewsPerUser();
 
     // sqlite3 post connection operations
     if (dbSettings.type.Equals("sqlite3"))

@@ -65,6 +65,8 @@ namespace VIDEO
   struct SScanSettings;
 }
 
+#define COUNT_WATCHLIST_PLAYCOUNT "count(watchlist.playCount)"
+
 // these defines are based on how many columns we have and which column certain data is going to be in
 // when we do GetDetailsForMovie()
 #define VIDEODB_MAX_COLUMNS 24
@@ -334,6 +336,12 @@ const struct SDbTableOffsets DbMusicVideoOffsets[] =
 class CVideoDatabase : public CDatabase
 {
 public:
+
+
+	static CStdString movieView;
+	static CStdString musicVideoView;
+	static CStdString tvShowView;
+	static CStdString episodeView;
 
   class CActor    // used for actor retrieval for non-master users
   {
@@ -785,9 +793,12 @@ protected:
   CStdString GetValueString(const CVideoInfoTag &details, int min, int max, const SDbTableOffsets *offsets) const;
 
 private:
+  static bool createdViewPerUser;
+
   virtual void CreateTables();
   virtual void CreateAnalytics();
   virtual void UpdateTables(int version);
+  virtual void generateViewsPerUser();
 
   /*! \brief (Re)Create the generic database views for movies, tvshows,
      episodes and music videos
