@@ -71,9 +71,17 @@ using namespace XFILE;
 using namespace VIDEO;
 using namespace ADDON;
 
+std::string CVideoDatabase::musicVideoView;
+std::string CVideoDatabase::tvShowView;
+std::string CVideoDatabase::episodeView;
+std::string CVideoDatabase::movieView;
+std::string CVideoDatabase::tvshowcountsView;
+std::string CVideoDatabase::seasonView;
+bool  CVideoDatabase::createdViewPerUser=false;
 //********************************************************************************************************************************
 CVideoDatabase::CVideoDatabase(void)
 {
+
 }
 
 //********************************************************************************************************************************
@@ -83,13 +91,25 @@ CVideoDatabase::~CVideoDatabase(void)
 //********************************************************************************************************************************
 bool CVideoDatabase::Open()
 {
+	
+	if(g_advancedSettings.Initialized()) {
+//		movieView = "movieview LEFT JOIN watchlist ON watchlist.idFile=movieview.idFile AND watchlist.idViewer = " +  g_advancedSettings.m_databaseVideo.userID  ;
+//		musicVideoView = "musicvideoview LEFT JOIN watchlist ON watchlist.idFile=musicvideoview.idFile AND watchlist.idViewer = "+ g_advancedSettings.m_databaseVideo.userID;
+		CVideoDatabase::tvShowView = "tvshowview"+ g_advancedSettings.m_databaseVideo.userID+" tvshowview";
+		CVideoDatabase::movieView = "movieview"+ g_advancedSettings.m_databaseVideo.userID+" movieview";
+		CVideoDatabase::musicVideoView = "musicvideoview"+ g_advancedSettings.m_databaseVideo.userID+" musicvideoview";
+		CVideoDatabase::episodeView = "episodeview" + g_advancedSettings.m_databaseVideo.userID+" episodeview";
+		CVideoDatabase::tvshowcountsView = "tvshowcounts"+ g_advancedSettings.m_databaseVideo.userID+ " tvshowcounts";
+
+//		generateTVShowView();
+	}
   return CDatabase::Open(g_advancedSettings.m_databaseVideo);
 }
 
 void CVideoDatabase::CreateTables()
 {
   CLog::Log(LOGINFO, "create bookmark table");
-  m_pDS->exec("CREATE TABLE bookmark ( idBookmark integer primary key, idFile integer, timeInSeconds double, totalTimeInSeconds double, thumbNailImage text, player text, playerState text, type integer)\n");
+  m_pDS->exec("CREATE TABLE bookmark ( idBookmark integer AUTO_INCREMENT , idViewer integer, idFile integer, timeInSeconds double, totalTimeInSeconds double, thumbNailImage text, player text, playerState text, type integer, PRIMARY KEY(idBookmark,idViewer))\n");
 
   CLog::Log(LOGINFO, "create settings table");
   m_pDS->exec("CREATE TABLE settings ( idFile integer, Deinterlace bool,"
@@ -139,7 +159,10 @@ void CVideoDatabase::CreateTables()
   m_pDS->exec("CREATE TABLE path ( idPath integer primary key, strPath text, strContent text, strScraper text, strHash text, scanRecursive integer, useFolderNames bool, strSettings text, noUpdate bool, exclude bool, dateAdded text, idParentPath integer)");
 
   CLog::Log(LOGINFO, "create files table");
-  m_pDS->exec("CREATE TABLE files ( idFile integer primary key, idPath integer, strFilename text, playCount integer, lastPlayed text, dateAdded text)");
+  m_pDS->exec("CREATE TABLE files ( idFile integer primary key, idPath integer, strFilename text, dateAdded text)");
+  
+   CLog::Log(LOGINFO, "create watchlist table");
+	m_pDS->exec("CREATE TABLE watchlist (  idFile integer, idViewer integer, playCount integer,  lastPlayed text, PRIMARY KEY (idFile,idViewer))");
 
   CLog::Log(LOGINFO, "create tvshow table");
   columns = "CREATE TABLE tvshow ( idShow integer primary key";
@@ -381,130 +404,177 @@ void CVideoDatabase::CreateAnalytics()
 
 void CVideoDatabase::CreateViews()
 {
-  CLog::Log(LOGINFO, "create episodeview");
-  CStdString episodeview = PrepareSQL("CREATE VIEW episodeview AS SELECT "
-                                      "  episode.*,"
-                                      "  files.strFileName AS strFileName,"
-                                      "  path.strPath AS strPath,"
-                                      "  files.playCount AS playCount,"
-                                      "  files.lastPlayed AS lastPlayed,"
-                                      "  files.dateAdded AS dateAdded,"
-                                      "  tvshow.c%02d AS strTitle,"
-                                      "  tvshow.c%02d AS strStudio,"
-                                      "  tvshow.c%02d AS premiered,"
-                                      "  tvshow.c%02d AS mpaa,"
-                                      "  bookmark.timeInSeconds AS resumeTimeInSeconds, "
-                                      "  bookmark.totalTimeInSeconds AS totalTimeInSeconds, "
-                                      "  seasons.idSeason AS idSeason "
-                                      "FROM episode"
-                                      "  JOIN files ON"
-                                      "    files.idFile=episode.idFile"
-                                      "  JOIN tvshow ON"
-                                      "    tvshow.idShow=episode.idShow"
-                                      "  LEFT JOIN seasons ON"
-                                      "    seasons.idShow=episode.idShow AND seasons.season=episode.c%02d"
-                                      "  JOIN path ON"
-                                      "    files.idPath=path.idPath"
-                                      "  LEFT JOIN bookmark ON"
-                                      "    bookmark.idFile=episode.idFile AND bookmark.type=1", VIDEODB_ID_TV_TITLE, VIDEODB_ID_TV_STUDIOS, VIDEODB_ID_TV_PREMIERED, VIDEODB_ID_TV_MPAA,VIDEODB_ID_EPISODE_SEASON);
-  m_pDS->exec(episodeview.c_str());
+	generateViewsPerUser();
+}
 
-  CLog::Log(LOGINFO, "create tvshowcounts");
-  CStdString tvshowcounts = PrepareSQL("CREATE VIEW tvshowcounts AS SELECT "
-                                       "      tvshow.idShow AS idShow,"
-                                       "      MAX(files.lastPlayed) AS lastPlayed,"
-                                       "      NULLIF(COUNT(episode.c12), 0) AS totalCount,"
-                                       "      COUNT(files.playCount) AS watchedcount,"
-                                       "      NULLIF(COUNT(DISTINCT(episode.c12)), 0) AS totalSeasons, "
-                                       "      MAX(files.dateAdded) as dateAdded "
-                                       "    FROM tvshow"
-                                       "      LEFT JOIN episode ON"
-                                       "        episode.idShow=tvshow.idShow"
-                                       "      LEFT JOIN files ON"
-                                       "        files.idFile=episode.idFile "
-                                       "    GROUP BY tvshow.idShow");
-  m_pDS->exec(tvshowcounts.c_str());
+void CVideoDatabase::generateViewsPerUser() {
 
-  CLog::Log(LOGINFO, "create tvshowview");
-  CStdString tvshowview = PrepareSQL("CREATE VIEW tvshowview AS SELECT "
-                                     "  tvshow.*,"
-                                     "  path.idParentPath AS idParentPath,"
-                                     "  path.strPath AS strPath,"
-                                     "  tvshowcounts.dateAdded AS dateAdded,"
-                                     "  lastPlayed, totalCount, watchedcount, totalSeasons "
-                                     "FROM tvshow"
-                                     "  LEFT JOIN tvshowlinkpath ON"
-                                     "    tvshowlinkpath.idShow=tvshow.idShow"
-                                     "  LEFT JOIN path ON"
-                                     "    path.idPath=tvshowlinkpath.idPath"
-                                     "  INNER JOIN tvshowcounts ON"
-                                     "    tvshow.idShow = tvshowcounts.idShow "
-                                     "GROUP BY tvshow.idShow");
-  m_pDS->exec(tvshowview.c_str());
+		if (!g_advancedSettings.Initialized() || CVideoDatabase::createdViewPerUser || GetDBVersion()< 90)
+			return;
+		CVideoDatabase::createdViewPerUser = true;
 
-  CLog::Log(LOGINFO, "create seasonview");
-  CStdString seasonview = PrepareSQL("CREATE VIEW seasonview AS SELECT "
-                                     "  seasons.*, "
-                                     "  tvshowview.strPath AS strPath,"
-                                     "  tvshowview.c%02d AS showTitle,"
-                                     "  tvshowview.c%02d AS plot,"
-                                     "  tvshowview.c%02d AS premiered,"
-                                     "  tvshowview.c%02d AS genre,"
-                                     "  tvshowview.c%02d AS strStudio,"
-                                     "  tvshowview.c%02d AS mpaa,"
-                                     "  count(DISTINCT episodeview.idEpisode) AS episodes,"
-                                     "  count(files.playCount) AS playCount "
-                                     "FROM seasons"
-                                     "  JOIN tvshowview ON"
-                                     "    tvshowview.idShow = seasons.idShow"
-                                     "  JOIN episodeview ON"
-                                     "    episodeview.idShow = seasons.idShow AND episodeview.c%02d = seasons.season"
-                                     "  JOIN files ON"
-                                     "    files.idFile = episodeview.idFile "
-                                     "GROUP BY seasons.idSeason",
-                                     VIDEODB_ID_TV_TITLE, VIDEODB_ID_TV_PLOT, VIDEODB_ID_TV_PREMIERED,
-                                     VIDEODB_ID_TV_GENRE, VIDEODB_ID_TV_STUDIOS, VIDEODB_ID_TV_MPAA,
-                                     VIDEODB_ID_EPISODE_SEASON);
-  m_pDS->exec(seasonview.c_str());
+		CVideoDatabase::tvShowView = "tvshowview" + g_advancedSettings.m_databaseVideo.userID + " tvshowview";
+		CVideoDatabase::movieView = "movieview" + g_advancedSettings.m_databaseVideo.userID + " movieview";
+		CVideoDatabase::musicVideoView = "musicvideoview" + g_advancedSettings.m_databaseVideo.userID + " musicvideoview";
+		CVideoDatabase::episodeView = "episodeview" + g_advancedSettings.m_databaseVideo.userID + " episodeview";
+		CVideoDatabase::seasonView = "seasonview" + g_advancedSettings.m_databaseVideo.userID + " seasonview";
+		CVideoDatabase::tvshowcountsView = "tvshowcounts" + g_advancedSettings.m_databaseVideo.userID + " tvshowcounts";
 
-  CLog::Log(LOGINFO, "create musicvideoview");
-  m_pDS->exec("CREATE VIEW musicvideoview AS SELECT"
-              "  musicvideo.*,"
-              "  files.strFileName as strFileName,"
-              "  path.strPath as strPath,"
-              "  files.playCount as playCount,"
-              "  files.lastPlayed as lastPlayed,"
-              "  files.dateAdded as dateAdded, "
-              "  bookmark.timeInSeconds AS resumeTimeInSeconds, "
-              "  bookmark.totalTimeInSeconds AS totalTimeInSeconds "
-              "FROM musicvideo"
-              "  JOIN files ON"
-              "    files.idFile=musicvideo.idFile"
-              "  JOIN path ON"
-              "    path.idPath=files.idPath"
-              "  LEFT JOIN bookmark ON"
-              "    bookmark.idFile=musicvideo.idFile AND bookmark.type=1");
+		CLog::Log(LOGINFO, "create tvshowcounts");
+		m_pDS->exec("DROP VIEW IF EXISTS tvshowcounts" + g_advancedSettings.m_databaseVideo.userID);
+		CStdString tvshowcounts = PrepareSQL("CREATE VIEW tvshowcounts" + g_advancedSettings.m_databaseVideo.userID + " AS SELECT "
+			" tvshow.idShow AS idShow,"
+			" MAX(watchlist.lastPlayed) AS lastPlayed,"
+			" NULLIF(COUNT(episode.c12), 0) AS totalCount,"
+			" COUNT(watchlist.playCount) AS watchedcount,"
+			" NULLIF(COUNT(DISTINCT(episode.c12)), 0) AS totalSeasons, "
+			" MAX(files.dateAdded) as dateAdded "
+			" FROM tvshow"
+			" LEFT JOIN episode ON"
+			" episode.idShow=tvshow.idShow"
+			" LEFT JOIN files ON"
+			" files.idFile=episode.idFile "
+			"LEFT JOIN watchlist ON"
+			"   watchlist.idFile=episode.idFile AND watchlist.idViewer =  " + g_advancedSettings.m_databaseVideo.userID +
+			" GROUP BY tvshow.idShow");
+		m_pDS->exec(tvshowcounts.c_str());
 
-  CLog::Log(LOGINFO, "create movieview");
-  m_pDS->exec("CREATE VIEW movieview AS SELECT"
-              "  movie.*,"
-              "  sets.strSet AS strSet,"
-              "  files.strFileName AS strFileName,"
-              "  path.strPath AS strPath,"
-              "  files.playCount AS playCount,"
-              "  files.lastPlayed AS lastPlayed, "
-              "  files.dateAdded AS dateAdded, "
-              "  bookmark.timeInSeconds AS resumeTimeInSeconds, "
-              "  bookmark.totalTimeInSeconds AS totalTimeInSeconds "
-              "FROM movie"
-              "  LEFT JOIN sets ON"
-              "    sets.idSet = movie.idSet"
-              "  JOIN files ON"
-              "    files.idFile=movie.idFile"
-              "  JOIN path ON"
-              "    path.idPath=files.idPath"
-              "  LEFT JOIN bookmark ON"
-              "    bookmark.idFile=movie.idFile AND bookmark.type=1");
+
+
+		CLog::Log(LOGINFO, "create tvshowview");
+		m_pDS->exec("DROP VIEW IF EXISTS tvshowview" + g_advancedSettings.m_databaseVideo.userID);
+		CLog::Log(LOGINFO, "create tvshowview");
+		CStdString tvshowview =
+			PrepareSQL("CREATE VIEW tvshowview"
+			+ g_advancedSettings.m_databaseVideo.userID
+			+ " AS SELECT "
+			" tvshow.*,"
+			" path.idParentPath AS idParentPath,"
+			" path.strPath AS strPath,"
+			" tvshowcounts.dateAdded AS dateAdded,"
+			" lastPlayed, totalCount, watchedcount, totalSeasons "
+			"FROM tvshow"
+			" LEFT JOIN tvshowlinkpath ON"
+			" tvshowlinkpath.idShow=tvshow.idShow"
+			" LEFT JOIN path ON"
+			" path.idPath=tvshowlinkpath.idPath"
+			" INNER JOIN " + CVideoDatabase::tvshowcountsView + " ON"
+			" tvshow.idShow = tvshowcounts.idShow "
+			"GROUP BY tvshow.idShow");
+		m_pDS->exec(tvshowview.c_str());
+
+
+
+		
+		CLog::Log(LOGINFO, "create episodeview");
+		m_pDS->exec("DROP VIEW IF EXISTS episodeview" + g_advancedSettings.m_databaseVideo.userID);
+		CStdString episodeview = PrepareSQL("CREATE  VIEW episodeview" + g_advancedSettings.m_databaseVideo.userID + " AS SELECT "
+			" episode.*,"
+			" files.strFileName AS strFileName,"
+			" path.strPath AS strPath,"
+			" watchlist.playCount AS playCount,"
+			" watchlist.lastPlayed AS lastPlayed,"
+			" files.dateAdded AS dateAdded,"
+			" tvshow.c%02d AS strTitle,"
+			" tvshow.c%02d AS strStudio,"
+			" tvshow.c%02d AS premiered,"
+			" tvshow.c%02d AS mpaa,"
+			" bookmark.timeInSeconds AS resumeTimeInSeconds, "
+			" bookmark.totalTimeInSeconds AS totalTimeInSeconds, "
+			" seasons.idSeason AS idSeason "
+			"FROM episode"
+			" JOIN files ON"
+			" files.idFile=episode.idFile"
+			" JOIN tvshow ON"
+			" tvshow.idShow=episode.idShow"
+			" LEFT JOIN seasons ON"
+			" seasons.idShow=episode.idShow AND seasons.season=episode.c%02d"
+			" JOIN path ON"
+			" files.idPath=path.idPath"
+			" LEFT JOIN watchlist ON"
+			" watchlist.idFile=episode.idFile AND watchlist.idViewer = %s"
+			" LEFT JOIN bookmark ON"
+			" bookmark.idFile=episode.idFile AND bookmark.type=1  AND bookmark.idViewer =watchlist.idViewer", VIDEODB_ID_TV_TITLE, VIDEODB_ID_TV_STUDIOS, VIDEODB_ID_TV_PREMIERED, VIDEODB_ID_TV_MPAA, VIDEODB_ID_EPISODE_SEASON, g_advancedSettings.m_databaseVideo.userID.c_str());
+		//  CLog::Log(LOGINFO, episodeview.c_str());
+		//  std::cout << "lÃ¤nge von dem KAcke: " << strlen(episodeview.c_str()) << "  " << episodeview << std::endl;
+		m_pDS->exec(episodeview.c_str());
+
+
+
+
+		CLog::Log(LOGINFO, "create seasonview");
+		m_pDS->exec("DROP VIEW IF EXISTS seasonview" + g_advancedSettings.m_databaseVideo.userID);
+		CStdString seasonview = PrepareSQL("CREATE VIEW seasonview%s AS SELECT "
+			"  seasons.*, "
+			"  tvshowview.strPath AS strPath,"
+			"  tvshowview.c%02d AS showTitle,"
+			"  tvshowview.c%02d AS plot,"
+			"  tvshowview.c%02d AS premiered,"
+			"  tvshowview.c%02d AS genre,"
+			"  tvshowview.c%02d AS strStudio,"
+			"  tvshowview.c%02d AS mpaa,"
+			"  count(DISTINCT episodeview.idEpisode) AS episodes,"
+			"  count(watchlist.playCount) AS playCount "
+			"FROM seasons"
+			"  JOIN %s ON"
+			"    tvshowview.idShow = seasons.idShow"
+			"  JOIN %s ON"
+			"    episodeview.idShow = seasons.idShow AND episodeview.c%02d = seasons.season"
+			"  JOIN files ON"
+			"    files.idFile = episodeview.idFile "
+			" LEFT JOIN watchlist ON"
+			" watchlist.idFile=files.idFile AND watchlist.idViewer = %s "
+			"GROUP BY seasons.idSeason", g_advancedSettings.m_databaseVideo.userID.c_str(),
+			VIDEODB_ID_TV_TITLE, VIDEODB_ID_TV_PLOT, VIDEODB_ID_TV_PREMIERED,
+			VIDEODB_ID_TV_GENRE, VIDEODB_ID_TV_STUDIOS, VIDEODB_ID_TV_MPAA, CVideoDatabase::tvShowView.c_str(), CVideoDatabase::episodeView.c_str(),
+			VIDEODB_ID_EPISODE_SEASON, g_advancedSettings.m_databaseVideo.userID.c_str());
+		m_pDS->exec(seasonview.c_str());
+
+		CLog::Log(LOGINFO, "create musicvideoview");
+		m_pDS->exec("DROP VIEW IF EXISTS musicvideoview" + g_advancedSettings.m_databaseVideo.userID);
+		m_pDS->exec("CREATE VIEW musicvideoview" + g_advancedSettings.m_databaseVideo.userID + " AS SELECT"
+			"  musicvideo.*,"
+			"  files.strFileName as strFileName,"
+			"  path.strPath as strPath,"
+			"  watchlist.playCount as playCount,"
+			"  watchlist.lastPlayed as lastPlayed,"
+			"  files.dateAdded as dateAdded, "
+			"  bookmark.timeInSeconds AS resumeTimeInSeconds, "
+			"  bookmark.totalTimeInSeconds AS totalTimeInSeconds "
+			"FROM musicvideo"
+			"  JOIN files ON"
+			"    files.idFile=musicvideo.idFile"
+			"  JOIN path ON"
+			"    path.idPath=files.idPath"
+			" LEFT JOIN watchlist ON"
+			"    watchlist.idFile=musicvideo.idFile AND watchlist.idViewer = " + g_advancedSettings.m_databaseVideo.userID +
+			"  LEFT JOIN bookmark ON"
+			"    bookmark.idFile=musicvideo.idFile AND bookmark.type=1  AND bookmark.idViewer =watchlist.idViewer ");
+
+		CLog::Log(LOGINFO, "create movieview");
+		m_pDS->exec("DROP VIEW IF EXISTS movieview" + g_advancedSettings.m_databaseVideo.userID);
+		m_pDS->exec("CREATE VIEW movieview" + g_advancedSettings.m_databaseVideo.userID + " AS SELECT"
+			"  movie.*,"
+			"  sets.strSet AS strSet,"
+			"  files.strFileName AS strFileName,"
+			"  path.strPath AS strPath,"
+			"  watchlist.playCount AS playCount,"
+			"  watchlist.lastPlayed AS lastPlayed, "
+			"  files.dateAdded AS dateAdded, "
+			"  bookmark.timeInSeconds AS resumeTimeInSeconds, "
+			"  bookmark.totalTimeInSeconds AS totalTimeInSeconds "
+			"FROM movie"
+			"  LEFT JOIN sets ON"
+			"    sets.idSet = movie.idSet"
+			"  JOIN files ON"
+			"    files.idFile=movie.idFile"
+			"  JOIN path ON"
+			"    path.idPath=files.idPath"
+			" LEFT JOIN watchlist ON"
+			"    watchlist.idFile=movie.idFile AND watchlist.idViewer = " + g_advancedSettings.m_databaseVideo.userID +
+			"  LEFT JOIN bookmark ON"
+			"    bookmark.idFile=movie.idFile AND bookmark.type=1 AND bookmark.idViewer =watchlist.idViewer");
+
 }
 
 //********************************************************************************************************************************
@@ -1922,9 +1992,9 @@ void CVideoDatabase::GetMusicVideosByArtist(const CStdString& strArtist, CFileIt
 
     CStdString strSQL;
     if (strArtist.empty())  // TODO: SMARTPLAYLISTS what is this here for???
-      strSQL=PrepareSQL("select distinct * from musicvideoview join artistlinkmusicvideo on artistlinkmusicvideo.idMVideo=musicvideoview.idMVideo join actors on actors.idActor=artistlinkmusicvideo.idArtist");
+      strSQL=PrepareSQL("select distinct * from "+CVideoDatabase::musicVideoView+" join artistlinkmusicvideo on artistlinkmusicvideo.idMVideo=musicvideoview.idMVideo join actors on actors.idActor=artistlinkmusicvideo.idArtist");
     else
-      strSQL=PrepareSQL("select * from musicvideoview join artistlinkmusicvideo on artistlinkmusicvideo.idMVideo=musicvideoview.idMVideo join actors on actors.idActor=artistlinkmusicvideo.idArtist where actors.strActor='%s'", strArtist.c_str());
+      strSQL=PrepareSQL("select * from "+CVideoDatabase::musicVideoView+" join artistlinkmusicvideo on artistlinkmusicvideo.idMVideo=musicvideoview.idMVideo join actors on actors.idActor=artistlinkmusicvideo.idArtist where actors.strActor='%s'", strArtist.c_str());
     m_pDS->query( strSQL.c_str() );
 
     while (!m_pDS->eof())
@@ -1953,7 +2023,7 @@ bool CVideoDatabase::GetMovieInfo(const CStdString& strFilenameAndPath, CVideoIn
       idMovie = GetMovieId(strFilenameAndPath);
     if (idMovie < 0) return false;
 
-    CStdString sql = PrepareSQL("select * from movieview where idMovie=%i", idMovie);
+    CStdString sql = PrepareSQL("select * from "+CVideoDatabase::movieView+" where idMovie=%i", idMovie);
     if (!m_pDS->query(sql.c_str()))
       return false;
     details = GetDetailsForMovie(m_pDS, true);
@@ -1975,7 +2045,9 @@ bool CVideoDatabase::GetTvShowInfo(const CStdString& strPath, CVideoInfoTag& det
       idTvShow = GetTvShowId(strPath);
     if (idTvShow < 0) return false;
 
-    CStdString sql = PrepareSQL("SELECT * FROM tvshowview WHERE idShow=%i GROUP BY idShow", idTvShow);
+
+    CStdString sql = PrepareSQL("SELECT * FROM "+CVideoDatabase::tvShowView+" WHERE idShow=%i GROUP BY idShow", idTvShow);
+
     if (!m_pDS->query(sql.c_str()))
       return false;
     details = GetDetailsForTvShow(m_pDS, true, item);
@@ -2040,8 +2112,8 @@ bool CVideoDatabase::GetEpisodeInfo(const CStdString& strFilenameAndPath, CVideo
     if (idEpisode < 0)
       idEpisode = GetEpisodeId(strFilenameAndPath);
     if (idEpisode < 0) return false;
-
-    CStdString sql = PrepareSQL("select * from episodeview where idEpisode=%i",idEpisode);
+    //TODO: Anschauen ob das so richtig ist
+    CStdString sql = PrepareSQL("select * from "+CVideoDatabase::episodeView+"  where idEpisode=%i",idEpisode);
     if (!m_pDS->query(sql.c_str()))
       return false;
     details = GetDetailsForEpisode(m_pDS, true);
@@ -2063,7 +2135,7 @@ bool CVideoDatabase::GetMusicVideoInfo(const CStdString& strFilenameAndPath, CVi
       idMVideo = GetMusicVideoId(strFilenameAndPath);
     if (idMVideo < 0) return false;
 
-    CStdString sql = PrepareSQL("select * from musicvideoview where idMVideo=%i", idMVideo);
+    CStdString sql = PrepareSQL("select * from "+CVideoDatabase::musicVideoView+" where idMVideo=%i", idMVideo);
     if (!m_pDS->query(sql.c_str()))
       return false;
     details = GetDetailsForMusicVideo(m_pDS, true);
@@ -2112,8 +2184,10 @@ bool CVideoDatabase::GetFileInfo(const CStdString& strFilenameAndPath, CVideoInf
 
     CStdString sql = PrepareSQL("SELECT * FROM files "
                                 "JOIN path ON path.idPath = files.idPath "
-                                "LEFT JOIN bookmark ON bookmark.idFile = files.idFile AND bookmark.type = %i "
-                                "WHERE files.idFile = %i", CBookmark::RESUME, idFile);
+                                "LEFT JOIN bookmark ON bookmark.idFile = files.idFile AND bookmark.type = %i AND bookmark.idViewer = "+g_advancedSettings.m_databaseVideo.userID+
+    				  	  	  	" LEFT JOIN watchlist ON"
+    				  	  	  	"    watchlist.idFile=files.idFile AND watchlist.idViewer = bookmark.idViewer"
+                                " WHERE files.idFile = %i", CBookmark::RESUME , idFile);
     if (!m_pDS->query(sql.c_str()))
       return false;
 
@@ -2121,9 +2195,9 @@ bool CVideoDatabase::GetFileInfo(const CStdString& strFilenameAndPath, CVideoInf
     details.m_strPath = m_pDS->fv("path.strPath").get_asString();
     CStdString strFileName = m_pDS->fv("files.strFilename").get_asString();
     ConstructPath(details.m_strFileNameAndPath, details.m_strPath, strFileName);
-    details.m_playCount = max(details.m_playCount, m_pDS->fv("files.playCount").get_asInt());
+    details.m_playCount = max(details.m_playCount, m_pDS->fv("watchlist.playCount").get_asInt());
     if (!details.m_lastPlayed.IsValid())
-      details.m_lastPlayed.SetFromDBDateTime(m_pDS->fv("files.lastPlayed").get_asString());
+      details.m_lastPlayed.SetFromDBDateTime(m_pDS->fv("watchlist.lastPlayed").get_asString());
     if (!details.m_dateAdded.IsValid())
       details.m_dateAdded.SetFromDBDateTime(m_pDS->fv("files.dateAdded").get_asString());
     if (!details.m_resumePoint.IsSet())
@@ -2272,24 +2346,25 @@ int CVideoDatabase::SetDetailsForMovie(const CStdString& strFilenameAndPath, con
     if (details.HasStreamDetails())
       SetStreamDetailsForFileId(details.m_streamDetails, GetFileId(strFilenameAndPath));
 
+
     SetArtForItem(idMovie, MediaTypeMovie, artwork);
 
     if (!details.m_strIMDBNumber.empty() && details.m_iYear)
     { // query DB for any movies matching imdbid and year
-      CStdString strSQL = PrepareSQL("select files.playCount, files.lastPlayed from movie,files where files.idFile=movie.idFile and movie.c%02d='%s' and movie.c%02d=%i and movie.idMovie!=%i and files.playCount > 0", VIDEODB_ID_IDENT, details.m_strIMDBNumber.c_str(), VIDEODB_ID_YEAR, details.m_iYear, idMovie);
+      CStdString strSQL = PrepareSQL("select watchlist.playCount, watchlist.lastPlayed from movie,files LEFT JOIN watchlist ON watchlist.idFile=files.idFile AND watchlist.idViewer = "+g_advancedSettings.m_databaseVideo.userID+" where files.idFile=movie.idFile and movie.c%02d='%s' and movie.c%02d=%i and movie.idMovie!=%i and watchlist.playCount > 0", VIDEODB_ID_IDENT, details.m_strIMDBNumber.c_str(), VIDEODB_ID_YEAR, details.m_iYear, idMovie);
       m_pDS->query(strSQL.c_str());
 
       if (!m_pDS->eof())
       {
-        int playCount = m_pDS->fv("files.playCount").get_asInt();
+    	  int playCount = m_pDS->fv("watchlist.playCount").get_asInt();
+    	  CDateTime lastPlayed;
+    	  lastPlayed.SetFromDBDateTime(m_pDS->fv("watchlist.lastPlayed").get_asString());
 
-        CDateTime lastPlayed;
-        lastPlayed.SetFromDBDateTime(m_pDS->fv("files.lastPlayed").get_asString());
 
         int idFile = GetFileId(strFilenameAndPath);
 
         // update with playCount and lastPlayed
-        strSQL = PrepareSQL("update files set playCount=%i,lastPlayed='%s' where idFile=%i", playCount, lastPlayed.GetAsDBDateTime().c_str(), idFile);
+        strSQL = PrepareSQL("update watchlist set playCount=%i,lastPlayed='%s' where idFile=%i AND watchlist.idViewer = "+g_advancedSettings.m_databaseVideo.userID, playCount, lastPlayed.GetAsDBDateTime().c_str(), idFile);
         m_pDS->exec(strSQL.c_str());
       }
 
@@ -2608,24 +2683,26 @@ int CVideoDatabase::SetDetailsForEpisode(const CStdString& strFilenameAndPath, c
     // ensure we have this season already added
     AddSeason(idShow, details.m_iSeason);
 
+
     SetArtForItem(idEpisode, MediaTypeEpisode, artwork);
 
     if (details.m_iEpisode != -1 && details.m_iSeason != -1)
     { // query DB for any episodes matching idShow, Season and Episode
-      CStdString strSQL = PrepareSQL("select files.playCount, files.lastPlayed from episode, files where files.idFile=episode.idFile and episode.c%02d=%i and episode.c%02d=%i AND episode.idShow=%i and episode.idEpisode!=%i and files.playCount > 0",VIDEODB_ID_EPISODE_SEASON, details.m_iSeason, VIDEODB_ID_EPISODE_EPISODE, details.m_iEpisode, idShow, idEpisode);
+    	CStdString strSQL = PrepareSQL("select watchlist.playCount, watchlist.lastPlayed from episode, files LEFT JOIN watchlist ON watchlist.idFile=files.idFile AND watchlist.idViewer = "+g_advancedSettings.m_databaseVideo.userID+" where files.idFile=episode.idFile and episode.c%02d=%i and episode.c%02d=%i AND episode.idShow=%i and episode.idEpisode!=%i and watchlist.playCount > 0",VIDEODB_ID_EPISODE_SEASON, details.m_iSeason, VIDEODB_ID_EPISODE_EPISODE, details.m_iEpisode, idShow, idEpisode);
       m_pDS->query(strSQL.c_str());
 
       if (!m_pDS->eof())
       {
-        int playCount = m_pDS->fv("files.playCount").get_asInt();
+        int playCount = m_pDS->fv("watchlist.playCount").get_asInt();
 
         CDateTime lastPlayed;
-        lastPlayed.SetFromDBDateTime(m_pDS->fv("files.lastPlayed").get_asString());
+        lastPlayed.SetFromDBDateTime(m_pDS->fv("watchlist.lastPlayed").get_asString());
 
         int idFile = GetFileId(strFilenameAndPath);
 
+
         // update with playCount and lastPlayed
-        strSQL = PrepareSQL("update files set playCount=%i,lastPlayed='%s' where idFile=%i", playCount, lastPlayed.GetAsDBDateTime().c_str(), idFile);
+strSQL = PrepareSQL("update watchlist set playCount=%i,lastPlayed='%s' where idFile=%i AND watchlist.idViewer = "+g_advancedSettings.m_databaseVideo.userID, playCount, lastPlayed.GetAsDBDateTime().c_str(), idFile);
         m_pDS->exec(strSQL.c_str());
       }
 
@@ -2888,7 +2965,7 @@ void CVideoDatabase::GetBookMarksForFile(const CStdString& strFilenameAndPath, V
       if (NULL == m_pDB.get()) return ;
       if (NULL == m_pDS.get()) return ;
 
-      CStdString strSQL=PrepareSQL("select * from bookmark where idFile=%i and type=%i order by timeInSeconds", idFile, (int)type);
+      CStdString strSQL=PrepareSQL("select * from bookmark where idFile=%i and type=%i and idViewer = "+ g_advancedSettings.m_databaseVideo.userID+" order by timeInSeconds", idFile, (int)type);
       m_pDS->query( strSQL.c_str() );
       while (!m_pDS->eof())
       {
@@ -2944,7 +3021,7 @@ void CVideoDatabase::DeleteResumeBookMark(const CStdString &strFilenameAndPath)
 
   try
   {
-    CStdString sql = PrepareSQL("delete from bookmark where idFile=%i and type=%i", fileID, CBookmark::RESUME);
+    CStdString sql = PrepareSQL("delete from bookmark where idFile=%i and type=%i AND idViewer = "+ g_advancedSettings.m_databaseVideo.userID, fileID, CBookmark::RESUME);
     m_pDS->exec(sql.c_str());
   }
   catch(...)
@@ -2957,7 +3034,7 @@ void CVideoDatabase::GetEpisodesByFile(const CStdString& strFilenameAndPath, vec
 {
   try
   {
-    CStdString strSQL = PrepareSQL("select * from episodeview where idFile=%i order by c%02d, c%02d asc", GetFileId(strFilenameAndPath), VIDEODB_ID_EPISODE_SORTSEASON, VIDEODB_ID_EPISODE_SORTEPISODE);
+    CStdString strSQL = PrepareSQL("select * from "+CVideoDatabase::episodeView+" where idFile=%i order by c%02d, c%02d asc", GetFileId(strFilenameAndPath), VIDEODB_ID_EPISODE_SORTSEASON, VIDEODB_ID_EPISODE_SORTEPISODE);
     m_pDS->query(strSQL.c_str());
     while (!m_pDS->eof())
     {
@@ -2987,14 +3064,14 @@ void CVideoDatabase::AddBookMarkToFile(const CStdString& strFilenameAndPath, con
     int idBookmark=-1;
     if (type == CBookmark::RESUME) // get the same resume mark bookmark each time type
     {
-      strSQL=PrepareSQL("select idBookmark from bookmark where idFile=%i and type=1", idFile);
+      strSQL=PrepareSQL("select idBookmark from bookmark where idFile=%i and type=1 and idViewer ="+g_advancedSettings.m_databaseVideo.userID, idFile);
     }
     else if (type == CBookmark::STANDARD) // get the same bookmark again, and update. not sure here as a dvd can have same time in multiple places, state will differ thou
     {
       /* get a bookmark within the same time as previous */
       double mintime = bookmark.timeInSeconds - 0.5f;
       double maxtime = bookmark.timeInSeconds + 0.5f;
-      strSQL=PrepareSQL("select idBookmark from bookmark where idFile=%i and type=%i and (timeInSeconds between %f and %f) and playerState='%s'", idFile, (int)type, mintime, maxtime, bookmark.playerState.c_str());
+      strSQL=PrepareSQL("select idBookmark from bookmark where idFile=%i and type=%i and (timeInSeconds between %f and %f) and playerState='%s' and idViewer ="+g_advancedSettings.m_databaseVideo.userID, idFile, (int)type, mintime, maxtime, bookmark.playerState.c_str());
     }
 
     if (type != CBookmark::EPISODE)
@@ -3007,9 +3084,9 @@ void CVideoDatabase::AddBookMarkToFile(const CStdString& strFilenameAndPath, con
     }
     // update or insert depending if it existed before
     if (idBookmark >= 0 )
-      strSQL=PrepareSQL("update bookmark set timeInSeconds = %f, totalTimeInSeconds = %f, thumbNailImage = '%s', player = '%s', playerState = '%s' where idBookmark = %i", bookmark.timeInSeconds, bookmark.totalTimeInSeconds, bookmark.thumbNailImage.c_str(), bookmark.player.c_str(), bookmark.playerState.c_str(), idBookmark);
+      strSQL=PrepareSQL("update bookmark set timeInSeconds = %f, totalTimeInSeconds = %f, thumbNailImage = '%s', player = '%s', playerState = '%s' where idBookmark = %i AND idViewer = "+g_advancedSettings.m_databaseVideo.userID, bookmark.timeInSeconds, bookmark.totalTimeInSeconds, bookmark.thumbNailImage.c_str(), bookmark.player.c_str(), bookmark.playerState.c_str(), idBookmark);
     else
-      strSQL=PrepareSQL("insert into bookmark (idBookmark, idFile, timeInSeconds, totalTimeInSeconds, thumbNailImage, player, playerState, type) values(NULL,%i,%f,%f,'%s','%s','%s', %i)", idFile, bookmark.timeInSeconds, bookmark.totalTimeInSeconds, bookmark.thumbNailImage.c_str(), bookmark.player.c_str(), bookmark.playerState.c_str(), (int)type);
+      strSQL=PrepareSQL("insert into bookmark (idBookmark, idFile,idViewer, timeInSeconds, totalTimeInSeconds, thumbNailImage, player, playerState, type) values(NULL,%i,"+g_advancedSettings.m_databaseVideo.userID+",%f,%f,'%s','%s','%s', %i)", idFile, bookmark.timeInSeconds, bookmark.totalTimeInSeconds, bookmark.thumbNailImage.c_str(), bookmark.player.c_str(), bookmark.playerState.c_str(), (int)type);
 
     m_pDS->exec(strSQL.c_str());
   }
@@ -3032,13 +3109,13 @@ void CVideoDatabase::ClearBookMarkOfFile(const CStdString& strFilenameAndPath, C
     /* should be no problem since we never add bookmarks that are closer than that   */
     double mintime = bookmark.timeInSeconds - 0.5f;
     double maxtime = bookmark.timeInSeconds + 0.5f;
-    CStdString strSQL = PrepareSQL("select idBookmark from bookmark where idFile=%i and type=%i and playerState like '%s' and player like '%s' and (timeInSeconds between %f and %f)", idFile, type, bookmark.playerState.c_str(), bookmark.player.c_str(), mintime, maxtime);
+    CStdString strSQL = PrepareSQL("select idBookmark from bookmark where idFile=%i and type=%i and playerState like '%s' and player like '%s' and (timeInSeconds between %f and %f) AND idViewer = "+g_advancedSettings.m_databaseVideo.userID, idFile, type, bookmark.playerState.c_str(), bookmark.player.c_str(), mintime, maxtime);
 
     m_pDS->query( strSQL.c_str() );
     if (m_pDS->num_rows() != 0)
     {
       int idBookmark = m_pDS->get_field_value("idBookmark").get_asInt();
-      strSQL=PrepareSQL("delete from bookmark where idBookmark=%i",idBookmark);
+      strSQL=PrepareSQL("delete from bookmark where idBookmark=%i AND idViewer = "+g_advancedSettings.m_databaseVideo.userID ,idBookmark);
       m_pDS->exec(strSQL.c_str());
       if (type == CBookmark::EPISODE)
       {
@@ -3073,7 +3150,7 @@ void CVideoDatabase::ClearBookMarksOfFile(int idFile, CBookmark::EType type /*= 
     if (NULL == m_pDB.get()) return ;
     if (NULL == m_pDS.get()) return ;
 
-    CStdString strSQL=PrepareSQL("delete from bookmark where idFile=%i and type=%i", idFile, (int)type);
+    CStdString strSQL=PrepareSQL("delete from bookmark where idFile=%i and idViewer= "+g_advancedSettings.m_databaseVideo.userID+" and type=%i", idFile, (int)type);
     m_pDS->exec(strSQL.c_str());
     if (type == CBookmark::EPISODE)
     {
@@ -3092,7 +3169,7 @@ bool CVideoDatabase::GetBookMarkForEpisode(const CVideoInfoTag& tag, CBookmark& 
 {
   try
   {
-    CStdString strSQL = PrepareSQL("select bookmark.* from bookmark join episode on episode.c%02d=bookmark.idBookmark where episode.idEpisode=%i", VIDEODB_ID_EPISODE_BOOKMARK, tag.m_iDbId);
+    CStdString strSQL = PrepareSQL("select bookmark.* from bookmark join episode on episode.c%02d=bookmark.idBookmark where episode.idEpisode=%i AND bookmark.idViewer = "+g_advancedSettings.m_databaseVideo.userID, VIDEODB_ID_EPISODE_BOOKMARK, tag.m_iDbId);
     m_pDS->query( strSQL.c_str() );
     if (!m_pDS->eof())
     {
@@ -3124,7 +3201,7 @@ void CVideoDatabase::AddBookMarkForEpisode(const CVideoInfoTag& tag, const CBook
   {
     int idFile = GetFileId(tag.m_strFileNameAndPath);
     // delete the current episode for the selected episode number
-    CStdString strSQL = PrepareSQL("delete from bookmark where idBookmark in (select c%02d from episode where c%02d=%i and c%02d=%i and idFile=%i)", VIDEODB_ID_EPISODE_BOOKMARK, VIDEODB_ID_EPISODE_SEASON, tag.m_iSeason, VIDEODB_ID_EPISODE_EPISODE, tag.m_iEpisode, idFile);
+    CStdString strSQL = PrepareSQL("delete from bookmark where idBookmark in (select c%02d from episode where c%02d=%i and c%02d=%i and idFile=%i) AND bookmark.idViewer = "+g_advancedSettings.m_databaseVideo.userID, VIDEODB_ID_EPISODE_BOOKMARK, VIDEODB_ID_EPISODE_SEASON, tag.m_iSeason, VIDEODB_ID_EPISODE_EPISODE, tag.m_iEpisode, idFile);
     m_pDS->exec(strSQL.c_str());
 
     AddBookMarkToFile(tag.m_strFileNameAndPath, bookmark, CBookmark::EPISODE);
@@ -3142,7 +3219,7 @@ void CVideoDatabase::DeleteBookMarkForEpisode(const CVideoInfoTag& tag)
 {
   try
   {
-    CStdString strSQL = PrepareSQL("delete from bookmark where idBookmark in (select c%02d from episode where idEpisode=%i)", VIDEODB_ID_EPISODE_BOOKMARK, tag.m_iDbId);
+    CStdString strSQL = PrepareSQL("delete from bookmark where idBookmark in (select c%02d from episode where idEpisode=%i) AND bookmark.idViewer = "+g_advancedSettings.m_databaseVideo.userID, VIDEODB_ID_EPISODE_BOOKMARK, tag.m_iDbId);
     m_pDS->exec(strSQL.c_str());
     strSQL = PrepareSQL("update episode set c%02d=-1 where idEpisode=%i", VIDEODB_ID_EPISODE_BOOKMARK, tag.m_iDbId);
     m_pDS->exec(strSQL.c_str());
@@ -3694,7 +3771,7 @@ bool CVideoDatabase::GetResumePoint(CVideoInfoTag& tag)
     }
     else
     {
-      CStdString strSQL=PrepareSQL("select timeInSeconds, totalTimeInSeconds from bookmark where idFile=%i and type=%i order by timeInSeconds", tag.m_iFileId, CBookmark::RESUME);
+      CStdString strSQL=PrepareSQL("select timeInSeconds, totalTimeInSeconds from bookmark where idFile=%i and type=%i AND idViewer = "+g_advancedSettings.m_databaseVideo.userID+" order by timeInSeconds", tag.m_iFileId, CBookmark::RESUME);
       m_pDS2->query( strSQL.c_str() );
       if (!m_pDS2->eof())
       {
@@ -4843,11 +4920,13 @@ bool CVideoDatabase::GetPlayCounts(const CStdString &strPath, CFileItemList &ite
     // TODO: also test a single query for the above and below
     CStdString sql = PrepareSQL(
       "SELECT"
-      "  files.strFilename, files.playCount,"
+      "  files.strFilename, watchlist.playCount,"
       "  bookmark.timeInSeconds, bookmark.totalTimeInSeconds "
       "FROM files"
       "  LEFT JOIN bookmark ON"
-      "    files.idFile = bookmark.idFile AND bookmark.type = %i"
+      "    files.idFile = bookmark.idFile AND bookmark.type = %i AND bookmark.idViewer = " + g_advancedSettings.m_databaseVideo.userID+
+      " LEFT JOIN watchlist ON"
+      "    watchlist.idFile=files.idFile AND watchlist.idViewer = bookmark.idViewer"
       "  WHERE files.idPath=%i", (int)CBookmark::RESUME, pathID);
 
     if (RunQuery(sql) <= 0)
@@ -4892,7 +4971,7 @@ int CVideoDatabase::GetPlayCount(const CFileItem &item)
     if (NULL == m_pDB.get()) return -1;
     if (NULL == m_pDS.get()) return -1;
 
-    CStdString strSQL = PrepareSQL("select playCount from files WHERE idFile=%i", id);
+    CStdString strSQL = PrepareSQL("select playCount from watchlist WHERE idFile=%i AND watchlist.idViewer = " + g_advancedSettings.m_databaseVideo.userID, id);
     int count = 0;
     if (m_pDS->query(strSQL.c_str()))
     {
@@ -4959,19 +5038,31 @@ void CVideoDatabase::SetPlayCount(const CFileItem &item, int count, const CDateT
     if (NULL == m_pDS.get()) return ;
 
     CStdString strSQL;
+     strSQL =PrepareSQL("SELECT * FROM watchlist where idFile=%i AND watchlist.idViewer ="+g_advancedSettings.m_databaseVideo.userID, id);
+    if( m_pDS->query(strSQL.c_str())) {
+		if(m_pDS->num_rows() == 0) {
+			m_pDS->close();
+			strSQL =PrepareSQL("INSERT INTO watchlist (`idFile`, `idViewer`, `playCount`, `lastPlayed`) VALUES (%i, "+g_advancedSettings.m_databaseVideo.userID+", NULL, NULL);", id);
+			m_pDS->exec(strSQL.c_str());
+		}
+   } else {
+	   m_pDS->close();
+	   strSQL =PrepareSQL("INSERT INTO watchlist (`idFile`, `idViewer`, `playCount`, `lastPlayed`) VALUES (%i, "+g_advancedSettings.m_databaseVideo.userID+", NULL, NULL);", id);
+	   m_pDS->exec(strSQL.c_str());
+   }
     if (count)
     {
       if (!date.IsValid())
-        strSQL = PrepareSQL("update files set playCount=%i,lastPlayed='%s' where idFile=%i", count, CDateTime::GetCurrentDateTime().GetAsDBDateTime().c_str(), id);
+        strSQL = PrepareSQL("update watchlist set playCount=%i,lastPlayed='%s' where idFile=%i AND watchlist.idViewer = "+g_advancedSettings.m_databaseVideo.userID, count, CDateTime::GetCurrentDateTime().GetAsDBDateTime().c_str(), id);
       else
-        strSQL = PrepareSQL("update files set playCount=%i,lastPlayed='%s' where idFile=%i", count, date.GetAsDBDateTime().c_str(), id);
+        strSQL = PrepareSQL("update watchlist set playCount=%i,lastPlayed='%s' where idFile=%i AND watchlist.idViewer = "+g_advancedSettings.m_databaseVideo.userID, count, date.GetAsDBDateTime().c_str(), id);
     }
     else
     {
       if (!date.IsValid())
-        strSQL = PrepareSQL("update files set playCount=NULL,lastPlayed=NULL where idFile=%i", id);
+        strSQL = PrepareSQL("update watchlist set playCount=NULL,lastPlayed=NULL where idFile=%i AND watchlist.idViewer = "+g_advancedSettings.m_databaseVideo.userID, id);
       else
-        strSQL = PrepareSQL("update files set playCount=NULL,lastPlayed='%s' where idFile=%i", date.GetAsDBDateTime().c_str(), id);
+        strSQL = PrepareSQL("update watchlist set playCount=NULL,lastPlayed='%s' where idFile=%i AND watchlist.idViewer = "+g_advancedSettings.m_databaseVideo.userID, date.GetAsDBDateTime().c_str(), id);
     }
 
     m_pDS->exec(strSQL.c_str());
@@ -5132,22 +5223,22 @@ bool CVideoDatabase::GetNavCommon(const CStdString& strBaseDir, CFileItemList& i
       if (idContent == VIDEODB_CONTENT_MOVIES)
       {
         strSQL = "select %s " + PrepareSQL("from %s ", type.c_str());
-        extFilter.fields = PrepareSQL("%s.id%s, %s.str%s, path.strPath, files.playCount", type.c_str(), type.c_str(), type.c_str(), type.c_str());
-        extFilter.AppendJoin(PrepareSQL("join %slinkmovie on %s.id%s = %slinkmovie.id%s join movieview on %slinkmovie.idMovie = movieview.idMovie join files on files.idFile = movieview.idFile join path on path.idPath = files.idPath",
+        extFilter.fields = PrepareSQL("%s.id%s, %s.str%s, path.strPath, watchlist.playCount", type.c_str(), type.c_str(), type.c_str(), type.c_str());
+        extFilter.AppendJoin(PrepareSQL("join %slinkmovie on %s.id%s = %slinkmovie.id%s join "+CVideoDatabase::movieView+" on %slinkmovie.idMovie = movieview.idMovie join files on files.idFile = movieview.idFile join path on path.idPath = files.idPath  LEFT JOIN watchlist ON watchlist.idFile=files.idFile AND watchlist.idViewer = " + g_advancedSettings.m_databaseVideo.userID,
                                         type.c_str(), type.c_str(), type.c_str(), type.c_str(), type.c_str(), type.c_str()));
       }
       else if (idContent == VIDEODB_CONTENT_TVSHOWS) //this will not get tvshows with 0 episodes
       {
         strSQL = "select %s " + PrepareSQL("from %s ", type.c_str());
         extFilter.fields = PrepareSQL("%s.id%s, %s.str%s, path.strPath", type.c_str(), type.c_str(), type.c_str(), type.c_str());
-        extFilter.AppendJoin(PrepareSQL("join %slinktvshow on %s.id%s = %slinktvshow.id%s join episodeview on %slinktvshow.idShow = episodeview.idShow join files on files.idFile = episodeview.idFile join path on path.idPath = files.idPath",
+        extFilter.AppendJoin(PrepareSQL("join %slinktvshow on %s.id%s = %slinktvshow.id%s join "+CVideoDatabase::episodeView+" on %slinktvshow.idShow = episodeview.idShow join files on files.idFile = episodeview.idFile join path on path.idPath = files.idPath",
                                         type.c_str(), type.c_str(), type.c_str(), type.c_str(), type.c_str(), type.c_str()));
       }
       else if (idContent == VIDEODB_CONTENT_MUSICVIDEOS)
       {
         strSQL = "select %s " + PrepareSQL("from %s ", type.c_str());
-        extFilter.fields = PrepareSQL("%s.id%s, %s.str%s, path.strPath, files.playCount", type.c_str(), type.c_str(), type.c_str(), type.c_str());
-        extFilter.AppendJoin(PrepareSQL("join %slinkmusicvideo on %s.id%s = %slinkmusicvideo.id%s join musicvideoview on %slinkmusicvideo.idMVideo = musicvideoview.idMVideo join files on files.idFile = musicvideoview.idFile join path on path.idPath = files.idPath",
+        extFilter.fields = PrepareSQL("%s.id%s, %s.str%s, path.strPath, watchlist.playCount", type.c_str(), type.c_str(), type.c_str(), type.c_str());
+        extFilter.AppendJoin(PrepareSQL("join %slinkmusicvideo on %s.id%s = %slinkmusicvideo.id%s join "+CVideoDatabase::musicVideoView+" on %slinkmusicvideo.idMVideo = musicvideoview.idMVideo join files on files.idFile = musicvideoview.idFile join path on path.idPath = files.idPath LEFT JOIN watchlist ON watchlist.idFile=files.idFile AND watchlist.idViewer = " + g_advancedSettings.m_databaseVideo.userID,
                                         type.c_str(), type.c_str(), type.c_str(), type.c_str(), type.c_str(), type.c_str()));
       }
       else
@@ -5158,8 +5249,8 @@ bool CVideoDatabase::GetNavCommon(const CStdString& strBaseDir, CFileItemList& i
       if (idContent == VIDEODB_CONTENT_MOVIES)
       {
         strSQL = "select %s " + PrepareSQL("from %s ", type.c_str());
-        extFilter.fields = PrepareSQL("%s.id%s, %s.str%s, count(1), count(files.playCount)", type.c_str(), type.c_str(), type.c_str(), type.c_str());
-        extFilter.AppendJoin(PrepareSQL("join %slinkmovie on %s.id%s = %slinkmovie.id%s join movieview on %slinkmovie.idMovie = movieview.idMovie join files on files.idFile = movieview.idFile",
+        extFilter.fields = PrepareSQL("%s.id%s, %s.str%s, count(1), count(watchlist.playCount)", type.c_str(), type.c_str(), type.c_str(), type.c_str());
+        extFilter.AppendJoin(PrepareSQL("join %slinkmovie on %s.id%s = %slinkmovie.id%s join "+CVideoDatabase::movieView+" on %slinkmovie.idMovie = movieview.idMovie join files on files.idFile = movieview.idFile LEFT JOIN watchlist ON watchlist.idFile=files.idFile AND watchlist.idViewer = " + g_advancedSettings.m_databaseVideo.userID,
                                         type.c_str(), type.c_str(), type.c_str(), type.c_str(), type.c_str(), type.c_str()));
         extFilter.AppendGroup(PrepareSQL("%s.id%s", type.c_str(), type.c_str()));
       }
@@ -5167,14 +5258,14 @@ bool CVideoDatabase::GetNavCommon(const CStdString& strBaseDir, CFileItemList& i
       {
         strSQL = "select %s " + PrepareSQL("from %s ", type.c_str());
         extFilter.fields = PrepareSQL("distinct %s.id%s, %s.str%s", type.c_str(), type.c_str(), type.c_str(), type.c_str());
-        extFilter.AppendJoin(PrepareSQL("join %slinktvshow on %s.id%s = %slinktvshow.id%s join tvshowview on %slinktvshow.idShow = tvshowview.idShow",
+        extFilter.AppendJoin(PrepareSQL("join %slinktvshow on %s.id%s = %slinktvshow.id%s join "+CVideoDatabase::tvShowView+" on %slinktvshow.idShow = tvshowview.idShow",
                                         type.c_str(), type.c_str(), type.c_str(), type.c_str(), type.c_str(), type.c_str()));
       }
       else if (idContent == VIDEODB_CONTENT_MUSICVIDEOS)
       {
         strSQL = "select %s " + PrepareSQL("from %s ", type.c_str());
-        extFilter.fields = PrepareSQL("%s.id%s, %s.str%s, count(1), count(files.playCount)", type.c_str(), type.c_str(), type.c_str(), type.c_str());
-        extFilter.AppendJoin(PrepareSQL("join %slinkmusicvideo on %s.id%s = %slinkmusicvideo.id%s join musicvideoview on %slinkmusicvideo.idMVideo = musicvideoview.idMVideo join files on files.idFile = musicvideoview.idFile",
+        extFilter.fields = PrepareSQL("%s.id%s, %s.str%s, count(1), count(watchlist.playCount)", type.c_str(), type.c_str(), type.c_str(), type.c_str());
+        extFilter.AppendJoin(PrepareSQL("join %slinkmusicvideo on %s.id%s = %slinkmusicvideo.id%s join "+CVideoDatabase::musicVideoView+" on %slinkmusicvideo.idMVideo = musicvideoview.idMVideo join files on files.idFile = musicvideoview.idFile LEFT JOIN watchlist ON watchlist.idFile=files.idFile AND watchlist.idViewer = "+ g_advancedSettings.m_databaseVideo.userID,
                                         type.c_str(), type.c_str(), type.c_str(), type.c_str(), type.c_str(), type.c_str()));
         extFilter.AppendGroup(PrepareSQL("%s.id%s", type.c_str(), type.c_str()));
       }
@@ -5313,7 +5404,7 @@ bool CVideoDatabase::GetTagsNav(const CStdString& strBaseDir, CFileItemList& ite
     extFilter.AppendJoin("JOIN tag ON tag.idTag = taglinks.idTag");
 
     if (idContent == (int)VIDEODB_CONTENT_MOVIES)
-      extFilter.AppendJoin("JOIN movieview ON movieview.idMovie = taglinks.idMedia");
+      extFilter.AppendJoin("JOIN "+CVideoDatabase::movieView+" ON movieview.idMovie = taglinks.idMedia");
 
     extFilter.AppendWhere(PrepareSQL("taglinks.media_type = '%s'", mediaType.c_str()));
     extFilter.AppendGroup("taglinks.idTag");
@@ -5433,7 +5524,7 @@ bool CVideoDatabase::GetMusicVideoAlbumsNav(const CStdString& strBaseDir, CFileI
     if (!videoUrl.FromString(strBaseDir))
       return false;
 
-    CStdString strSQL = "select %s from musicvideoview ";
+    CStdString strSQL = "select %s from "+CVideoDatabase::musicVideoView+" ";
     Filter extFilter = filter;
     extFilter.fields = PrepareSQL("musicvideoview.c%02d, musicvideoview.idMVideo, actors.strActor", VIDEODB_ID_MUSICVIDEO_ALBUM);
     extFilter.AppendJoin(PrepareSQL("join artistlinkmusicvideo on artistlinkmusicvideo.idMVideo = musicvideoview.idMVideo"));
@@ -5602,29 +5693,29 @@ bool CVideoDatabase::GetPeopleNav(const CStdString& strBaseDir, CFileItemList& i
       if (idContent == VIDEODB_CONTENT_MOVIES)
       {
         strSQL = "select %s from actors ";
-        extFilter.fields = "actors.idActor, actors.strActor, actors.strThumb, path.strPath, files.playCount";
-        extFilter.AppendJoin(PrepareSQL("join %slinkmovie on actors.idActor = %slinkmovie.id%s join movieview on %slinkmovie.idMovie = movieview.idMovie join files on files.idFile = movieview.idFile join path on path.idPath = files.idPath",
+        extFilter.fields = "actors.idActor, actors.strActor, actors.strThumb, path.strPath, watchlist.playCount";
+        extFilter.AppendJoin(PrepareSQL("join %slinkmovie on actors.idActor = %slinkmovie.id%s join "+CVideoDatabase::movieView+" on %slinkmovie.idMovie = movieview.idMovie join files on files.idFile = movieview.idFile join path on path.idPath = files.idPath LEFT JOIN watchlist ON watchlist.idFile=files.idFile AND watchlist.idViewer = " + g_advancedSettings.m_databaseVideo.userID,
                                         type.c_str(), type.c_str(), type.c_str(), type.c_str()));
       }
       else if (idContent == VIDEODB_CONTENT_TVSHOWS)
       {
         strSQL = "select %s from actors ";
         extFilter.fields = "actors.idActor, actors.strActor, actors.strThumb, path.strPath";
-        extFilter.AppendJoin(PrepareSQL("join %slinktvshow on actors.idActor = %slinktvshow.id%s join episodeview on %slinktvshow.idShow = episodeview.idShow join files on files.idFile = episodeview.idFile join path on path.idPath = files.idPath",
+        extFilter.AppendJoin(PrepareSQL("join %slinktvshow on actors.idActor = %slinktvshow.id%s join "+CVideoDatabase::episodeView+" on %slinktvshow.idShow = episodeview.idShow join files on files.idFile = episodeview.idFile join path on path.idPath = files.idPath",
                                         type.c_str(), type.c_str(), type.c_str(), type.c_str()));
       }
       else if (idContent == VIDEODB_CONTENT_EPISODES)
       {
         strSQL = "select %s from actors ";
-        extFilter.fields = "actors.idActor, actors.strActor, actors.strThumb, path.strPath, files.playCount";
-        extFilter.AppendJoin(PrepareSQL("join %slinkepisode on actors.idActor = %slinkepisode.id%s join episodeview on %slinkepisode.idEpisode = episodeview.idEpisode join files on files.idFile = episodeview.idFile join path on path.idPath = files.idPath",
+        extFilter.fields = "actors.idActor, actors.strActor, actors.strThumb, path.strPath, watchlist.playCount";
+        extFilter.AppendJoin(PrepareSQL("join %slinkepisode on actors.idActor = %slinkepisode.id%s join "+CVideoDatabase::episodeView+" on %slinkepisode.idEpisode = episodeview.idEpisode join files on files.idFile = episodeview.idFile join path on path.idPath = files.idPath LEFT JOIN watchlist ON watchlist.idFile=files.idFile AND watchlist.idViewer = " + g_advancedSettings.m_databaseVideo.userID,
                                         type.c_str(), type.c_str(), type.c_str(), type.c_str()));
       }
       else if (idContent == VIDEODB_CONTENT_MUSICVIDEOS)
       {
         strSQL = "select %s from actors ";
-        extFilter.fields = "actors.idActor, actors.strActor, actors.strThumb, path.strPath, files.playCount";
-        extFilter.AppendJoin(PrepareSQL("join %slinkmusicvideo on actors.idActor = %slinkmusicvideo.id%s join musicvideoview on %slinkmusicvideo.idMVideo = musicvideoview.idMVideo join files on files.idFile = musicvideoview.idFile join path on path.idPath = files.idPath",
+        extFilter.fields = "actors.idActor, actors.strActor, actors.strThumb, path.strPath, watchlist.playCount";
+        extFilter.AppendJoin(PrepareSQL("join %slinkmusicvideo on actors.idActor = %slinkmusicvideo.id%s join "+CVideoDatabase::musicVideoView+" on %slinkmusicvideo.idMVideo = musicvideoview.idMVideo join files on files.idFile = musicvideoview.idFile join path on path.idPath = files.idPath LEFT JOIN watchlist ON watchlist.idFile=files.idFile AND watchlist.idViewer = "+g_advancedSettings.m_databaseVideo.userID,
                                         type.c_str(), type.c_str(), type.c_str(), type.c_str()));
       }
       else
@@ -5635,31 +5726,31 @@ bool CVideoDatabase::GetPeopleNav(const CStdString& strBaseDir, CFileItemList& i
       if (idContent == VIDEODB_CONTENT_MOVIES)
       {
         strSQL ="select %s from actors ";
-        extFilter.fields = "actors.idActor, actors.strActor, actors.strThumb, count(1), count(files.playCount)";
-        extFilter.AppendJoin(PrepareSQL("join %slinkmovie on actors.idActor = %slinkmovie.id%s join movieview on %slinkmovie.idMovie = movieview.idMovie join files on files.idFile = movieview.idFile",
+        extFilter.fields = "actors.idActor, actors.strActor, actors.strThumb, count(1), count(watchList.playCount)";
+        extFilter.AppendJoin(PrepareSQL("join %slinkmovie on actors.idActor = %slinkmovie.id%s join "+CVideoDatabase::movieView+" on %slinkmovie.idMovie = movieview.idMovie join files on files.idFile = movieview.idFile LEFT JOIN watchlist ON watchlist.idFile=files.idFile AND watchlist.idViewer = "+g_advancedSettings.m_databaseVideo.userID,
                                         type.c_str(), type.c_str(), type.c_str(), type.c_str()));
         extFilter.AppendGroup("actors.idActor");
       }
       else if (idContent == VIDEODB_CONTENT_TVSHOWS)
       {
-        strSQL = "select %s " + PrepareSQL("from actors, %slinktvshow, tvshowview ", type.c_str());
-        extFilter.fields = "distinct actors.idActor, actors.strActor, actors.strThumb";
+        strSQL = "select %s " + PrepareSQL("from actors, %slinktvshow,  "+ CVideoDatabase::tvShowView, type.c_str());
+        extFilter.fields = " distinct actors.idActor, actors.strActor, actors.strThumb";
         extFilter.AppendWhere(PrepareSQL("actors.idActor = %slinktvshow.id%s and %slinktvshow.idShow = tvshowview.idShow",
                                          type.c_str(), type.c_str(), type.c_str()));
       }
       else if (idContent == VIDEODB_CONTENT_EPISODES)
       {
-        strSQL = "select %s " + PrepareSQL("from %slinkepisode, actors, episodeview, files ", type.c_str());
-        extFilter.fields = "actors.idActor, actors.strActor, actors.strThumb, count(1), count(files.playCount)";
-        extFilter.AppendWhere(PrepareSQL("actors.idActor = %slinkepisode.id%s and %slinkepisode.idEpisode = episodeview.idEpisode and files.idFile = episodeview.idFile",
+        strSQL = "select %s " + PrepareSQL("from %slinkepisode, actors, "+CVideoDatabase::episodeView+", files ", type.c_str());
+        extFilter.fields = "actors.idActor, actors.strActor, actors.strThumb, count(1), count(watchlist.playCount)";
+        extFilter.AppendWhere(PrepareSQL("actors.idActor = %slinkepisode.id%s and %slinkepisode.idEpisode = episodeview.idEpisode and files.idFile = episodeview.idFile LEFT JOIN watchlist ON watchlist.idFile=files.idFile AND watchlist.idViewer = " + g_advancedSettings.m_databaseVideo.userID,
                                          type.c_str(), type.c_str(), type.c_str()));
         extFilter.AppendGroup("actors.idActor");
       }
       else if (idContent == VIDEODB_CONTENT_MUSICVIDEOS)
       {
         strSQL = "select %s from actors ";
-        extFilter.fields = "actors.idActor, actors.strActor, actors.strThumb, count(1), count(files.playCount)";
-        extFilter.AppendJoin(PrepareSQL("join %slinkmusicvideo on actors.idActor = %slinkmusicvideo.id%s join musicvideoview on %slinkmusicvideo.idMVideo = musicvideoview.idMVideo join files on files.idFile = musicvideoview.idFile",
+        extFilter.fields = "actors.idActor, actors.strActor, actors.strThumb, count(1), count(watchlist.playCount)";
+        extFilter.AppendJoin(PrepareSQL("join %slinkmusicvideo on actors.idActor = %slinkmusicvideo.id%s join "+CVideoDatabase::musicVideoView+" on %slinkmusicvideo.idMVideo = musicvideoview.idMVideo join files on files.idFile = musicvideoview.idFile LEFT JOIN watchlist ON watchlist.idFile=files.idFile AND watchlist.idViewer = "+g_advancedSettings.m_databaseVideo.userID,
                                         type.c_str(), type.c_str(), type.c_str(), type.c_str()));
         extFilter.AppendGroup("actors.idActor");
       }
@@ -5806,18 +5897,18 @@ bool CVideoDatabase::GetYearsNav(const CStdString& strBaseDir, CFileItemList& it
     {
       if (idContent == VIDEODB_CONTENT_MOVIES)
       {
-        strSQL = PrepareSQL("select movieview.c%02d, path.strPath, files.playCount from movieview ", VIDEODB_ID_YEAR);
-        extFilter.AppendJoin("join files on files.idFile = movieview.idFile join path on files.idPath = path.idPath");
+        strSQL = PrepareSQL("select movieview.c%02d, path.strPath, watchlist.playCount from "+CVideoDatabase::movieView+" ", VIDEODB_ID_YEAR);
+        extFilter.AppendJoin(PrepareSQL("join files on files.idFile = movieview.idFile join path on files.idPath = path.idPath LEFT JOIN watchlist ON watchlist.idFile=files.idFile AND watchlist.idViewer = "+ g_advancedSettings.m_databaseVideo.userID +" "));
       }
       else if (idContent == VIDEODB_CONTENT_TVSHOWS)
       {
-        strSQL = PrepareSQL("select tvshowview.c%02d, path.strPath from tvshowview ", VIDEODB_ID_TV_PREMIERED);
-        extFilter.AppendJoin("join episodeview on episodeview.idShow = tvshowview.idShow join files on files.idFile = episodeview.idFile join path on files.idPath = path.idPath");
+        strSQL = PrepareSQL("select tvshowview.c%02d, path.strPath from "+ CVideoDatabase::tvShowView+" ", VIDEODB_ID_TV_PREMIERED);
+        extFilter.AppendJoin("join "+CVideoDatabase::episodeView+" on episodeview.idShow = tvshowview.idShow join files on files.idFile = episodeview.idFile join path on files.idPath = path.idPath");
       }
       else if (idContent == VIDEODB_CONTENT_MUSICVIDEOS)
       {
-        strSQL = PrepareSQL("select musicvideoview.c%02d, path.strPath, files.playCount from musicvideoview ", VIDEODB_ID_MUSICVIDEO_YEAR);
-        extFilter.AppendJoin("join files on files.idFile = musicvideoview.idFile join path on files.idPath = path.idPath");
+        strSQL = PrepareSQL("select musicvideoview.c%02d, path.strPath, watchlist.playCount from "+CVideoDatabase::movieView+" ", VIDEODB_ID_MUSICVIDEO_YEAR);
+        extFilter.AppendJoin(PrepareSQL("join files on files.idFile = musicvideoview.idFile join path on files.idPath = path.idPath LEFT JOIN watchlist ON watchlist.idFile=files.idFile AND watchlist.idViewer = "+g_advancedSettings.m_databaseVideo.userID +" " ));
       }
       else
         return false;
@@ -5827,19 +5918,20 @@ bool CVideoDatabase::GetYearsNav(const CStdString& strBaseDir, CFileItemList& it
       CStdString group;
       if (idContent == VIDEODB_CONTENT_MOVIES)
       {
-        strSQL = PrepareSQL("select movieview.c%02d, count(1), count(files.playCount) from movieview ", VIDEODB_ID_YEAR);
-        extFilter.AppendJoin("join files on files.idFile = movieview.idFile");
+        strSQL = PrepareSQL("select movieview.c%02d, count(1), count(watchlist.playCount) from "+CVideoDatabase::movieView+" ", VIDEODB_ID_YEAR);
+        extFilter.AppendJoin(PrepareSQL("join files on files.idFile = movieview.idFile LEFT JOIN watchlist ON watchlist.idFile=files.idFile AND watchlist.idViewer = " +g_advancedSettings.m_databaseVideo.userID +" "));
         extFilter.AppendGroup(PrepareSQL("movieview.c%02d", VIDEODB_ID_YEAR));
       }
       else if (idContent == VIDEODB_CONTENT_TVSHOWS)
       {
-        strSQL = PrepareSQL("select distinct tvshowview.c%02d from tvshowview", VIDEODB_ID_TV_PREMIERED);
+    	  strSQL = PrepareSQL("select distinct tvshowview.c%02d from "+CVideoDatabase::tvShowView+" ", VIDEODB_ID_TV_PREMIERED);
         extFilter.AppendGroup(PrepareSQL("tvshowview.c%02d", VIDEODB_ID_TV_PREMIERED));
       }
+
       else if (idContent == VIDEODB_CONTENT_MUSICVIDEOS)
       {
-        strSQL = PrepareSQL("select musicvideoview.c%02d, count(1), count(files.playCount) from musicvideoview ", VIDEODB_ID_MUSICVIDEO_YEAR);
-        extFilter.AppendJoin("join files on files.idFile = musicvideoview.idFile");
+        strSQL = PrepareSQL("select musicvideoview.c%02d, count(1), count(watchlist.playCount) from "+CVideoDatabase::movieView+" ", VIDEODB_ID_MUSICVIDEO_YEAR);
+        extFilter.AppendJoin(PrepareSQL("join files on files.idFile = musicvideoview.idFile LEFT JOIN watchlist ON watchlist.idFile=files.idFile AND watchlist.idViewer = " + g_advancedSettings.m_databaseVideo.userID +" "));
         extFilter.AppendGroup(PrepareSQL("musicvideoview.c%02d", VIDEODB_ID_MUSICVIDEO_YEAR));
       }
       else
@@ -6008,7 +6100,40 @@ bool CVideoDatabase::GetSeasonsByWhere(const CStdString& strBaseDir, const Filte
     if (!videoUrl.FromString(strBaseDir))
       return false;
 
-    CStdString strSQL = "SELECT * FROM seasonview ";
+//<<<<<<< HEAD
+	CStdString strSQL = "SELECT * FROM " + CVideoDatabase::seasonView;
+/*=======
+    CStdString strIn = PrepareSQL("= %i", idShow);
+    GetStackedTvShowList(idShow, strIn);
+
+    CStdString strSQL = PrepareSQL("SELECT episodeview.c%02d, "
+                                          "path.strPath, "
+                                          "tvshowview.c%02d, tvshowview.c%02d, tvshowview.c%02d, tvshowview.c%02d, tvshowview.c%02d, tvshowview.c%02d, "
+                                          "seasons.idSeason, "
+                                          "count(1), count(watchlist.playCount) "
+                                          "FROM "+CVideoDatabase::episodeView+" ", VIDEODB_ID_EPISODE_SEASON, VIDEODB_ID_TV_TITLE, VIDEODB_ID_TV_PLOT, VIDEODB_ID_TV_PREMIERED, VIDEODB_ID_TV_GENRE, VIDEODB_ID_TV_STUDIOS, VIDEODB_ID_TV_MPAA);
+    
+    Filter filter;
+    filter.join = PrepareSQL("JOIN "+CVideoDatabase::tvShowView+"  ON tvshowview.idShow = episodeview.idShow "
+                             "JOIN seasons ON (seasons.idShow = tvshowview.idShow AND seasons.season = episodeview.c%02d) "
+                             "JOIN files ON files.idFile = episodeview.idFile "
+                             "JOIN tvshowlinkpath ON tvshowlinkpath.idShow = tvshowview.idShow "
+    						 "LEFT JOIN watchlist ON watchlist.idFile=files.idFile AND watchlist.idViewer = "+g_advancedSettings.m_databaseVideo.userID+
+                             " JOIN path ON path.idPath = tvshowlinkpath.idPath",VIDEODB_ID_EPISODE_SEASON);
+    filter.where = PrepareSQL("tvshowview.idShow %s", strIn.c_str());
+    filter.group = PrepareSQL("episodeview.c%02d", VIDEODB_ID_EPISODE_SEASON);
+
+    videoUrl.AddOption("tvshowid", idShow);
+
+    if (idActor != -1)
+      videoUrl.AddOption("actorid", idActor);
+    else if (idDirector != -1)
+      videoUrl.AddOption("directorid", idDirector);
+    else if (idGenre != -1)
+      videoUrl.AddOption("genreid", idGenre);
+    else if (idYear != -1)
+      videoUrl.AddOption("year", idYear);
+>>>>>>> d50a776... Watchstate fÃ¼r mehrere Clients in einer Datenbank*/
 
     Filter extFilter = filter;
     if (!BuildSQL(strBaseDir, strSQL, extFilter, strSQL, videoUrl))
@@ -6265,8 +6390,9 @@ bool CVideoDatabase::GetMoviesByWhere(const CStdString& strBaseDir, const Filter
 
     int total = -1;
 
-    std::string strSQL = "select %s from movieview ";
+    std::string strSQL = "select %s from "+CVideoDatabase::movieView+"  LEFT JOIN watchlist ON watchlist.idFile=movieview.idFile AND watchlist.idViewer ="+ g_advancedSettings.m_databaseVideo.userID+" ";
     std::string strSQLExtra;
+
     if (!CDatabase::BuildSQL(strSQLExtra, extFilter, strSQLExtra))
       return false;
 
@@ -6368,7 +6494,8 @@ bool CVideoDatabase::GetTvShowsByWhere(const CStdString& strBaseDir, const Filte
 
     int total = -1;
     
-    std::string strSQL = "SELECT %s FROM tvshowview ";
+    std::string strSQL = "SELECT %s FROM "+CVideoDatabase::tvShowView;
+
     CVideoDbUrl videoUrl;
     std::string strSQLExtra;
     Filter extFilter = filter;
@@ -6495,7 +6622,8 @@ bool CVideoDatabase::GetEpisodesByWhere(const CStdString& strBaseDir, const Filt
 
     int total = -1;
     
-    std::string strSQL = "select %s from episodeview ";
+    std::string strSQL = "select %s from "+CVideoDatabase::episodeView+"  LEFT JOIN watchlist ON watchlist.idFile=episodeview.idFile AND watchlist.idViewer =" + g_advancedSettings.m_databaseVideo.userID+" ";
+
     CVideoDbUrl videoUrl;
     std::string strSQLExtra;
     Filter extFilter = filter;
@@ -6671,9 +6799,11 @@ bool CVideoDatabase::HasSets() const
     if (NULL == m_pDB.get()) return false;
     if (NULL == m_pDS.get()) return false;
 
-    m_pDS->query("SELECT movieview.idSet,COUNT(1) AS c FROM movieview "
-                 "JOIN sets ON sets.idSet = movieview.idSet "
-                 "GROUP BY movieview.idSet HAVING c>1");
+	CStdString sql = "SELECT movieview.idSet,COUNT(1) AS c FROM " + CVideoDatabase::movieView +
+		" JOIN sets ON sets.idSet = movieview.idSet "
+		"GROUP BY movieview.idSet HAVING c>1";
+
+    m_pDS->query(sql.c_str());
 
     bool bResult = (m_pDS->num_rows() > 0);
     m_pDS->close();
@@ -6764,7 +6894,7 @@ int CVideoDatabase::GetMusicVideoCount(const CStdString& strWhere)
     if (NULL == m_pDB.get()) return 0;
     if (NULL == m_pDS.get()) return 0;
 
-    CStdString strSQL = StringUtils::Format("select count(1) as nummovies from musicvideoview where %s",strWhere.c_str());
+	CStdString strSQL = StringUtils::Format("select count(1) as nummovies from %s where %s", CVideoDatabase::musicVideoView,strWhere.c_str());
     m_pDS->query( strSQL.c_str() );
 
     int iResult = 0;
@@ -6952,7 +7082,7 @@ CStdString CVideoDatabase::GetContentForPath(const CStdString& strPath)
       // 1. if episodes are in the path then we're in episodes.
       // 2. if no episodes are found, and content was set directly on this path, then we're in shows.
       // 3. if no episodes are found, and content was not set directly on this path, we're in seasons (assumes tvshows/seasons/episodes)
-      CStdString sql = PrepareSQL("select count(1) from episodeview where strPath = '%s' limit 1", strPath.c_str());
+      CStdString sql = PrepareSQL("select count(1) from "+CVideoDatabase::episodeView+" where strPath = '%s' limit 1", strPath.c_str());
       m_pDS->query( sql.c_str() );
       if (m_pDS->num_rows() && m_pDS->fv(0).get_asInt() > 0)
         return "episodes";
@@ -7347,7 +7477,8 @@ bool CVideoDatabase::GetMusicVideosByWhere(const CStdString &baseDir, const Filt
 
     int total = -1;
     
-    std::string strSQL = "select %s from musicvideoview ";
+    std::string strSQL = "select %s from "+CVideoDatabase::musicVideoView+" LEFT JOIN watchlist ON watchlist.idFile=musicvideoview.idFile AND watchlist.idViewer =" + g_advancedSettings.m_databaseVideo.userID +" ";
+
     CVideoDbUrl videoUrl;
     std::string strSQLExtra;
     Filter extFilter = filter;
@@ -7423,7 +7554,7 @@ unsigned int CVideoDatabase::GetMusicVideoIDs(const CStdString& strWhere, vector
     if (NULL == m_pDB.get()) return 0;
     if (NULL == m_pDS.get()) return 0;
 
-    CStdString strSQL = "select distinct idMVideo from musicvideoview " + strWhere;
+    CStdString strSQL = "select distinct idMVideo from "+CVideoDatabase::musicVideoView.append(strWhere);
     if (!m_pDS->query(strSQL.c_str())) return 0;
     songIDs.clear();
     if (m_pDS->num_rows() == 0)
@@ -7457,7 +7588,7 @@ bool CVideoDatabase::GetRandomMusicVideo(CFileItem* item, int& idSong, const CSt
     if (NULL == m_pDS.get()) return false;
 
     // We don't use PrepareSQL here, as the WHERE clause is already formatted.
-    CStdString strSQL = StringUtils::Format("select * from musicvideoview where %s", strWhere.c_str());
+	CStdString strSQL = StringUtils::Format("select * from %s where %s", CVideoDatabase::musicVideoView, strWhere.c_str());
     strSQL += PrepareSQL(" order by RANDOM() limit 1");
     CLog::Log(LOGDEBUG, "%s query = %s", __FUNCTION__, strSQL.c_str());
     // run query
@@ -8464,7 +8595,7 @@ void CVideoDatabase::ExportToXML(const CStdString &path, bool singleFiles /* = f
 
     progress = (CGUIDialogProgress *)g_windowManager.GetWindow(WINDOW_DIALOG_PROGRESS);
     // find all movies
-    CStdString sql = "select * from movieview";
+    CStdString sql = "select * from "+CVideoDatabase::movieView+"";
 
     m_pDS->query(sql.c_str());
 
@@ -8597,7 +8728,7 @@ void CVideoDatabase::ExportToXML(const CStdString &path, bool singleFiles /* = f
     m_pDS->close();
 
     // find all musicvideos
-    sql = "select * from musicvideoview";
+    sql = "select * from "+CVideoDatabase::musicVideoView+"";
 
     m_pDS->query(sql.c_str());
 
@@ -8692,7 +8823,7 @@ void CVideoDatabase::ExportToXML(const CStdString &path, bool singleFiles /* = f
     m_pDS->close();
 
     // repeat for all tvshows
-    sql = "SELECT * FROM tvshowview";
+    sql = "SELECT * FROM "+CVideoDatabase::tvShowView;
     m_pDS->query(sql.c_str());
 
     total = m_pDS->num_rows();
@@ -8811,7 +8942,7 @@ void CVideoDatabase::ExportToXML(const CStdString &path, bool singleFiles /* = f
       }
 
       // now save the episodes from this show
-      sql = PrepareSQL("select * from episodeview where idShow=%i order by strFileName, idEpisode",tvshow.m_iDbId);
+      sql = PrepareSQL("select * from "+CVideoDatabase::episodeView+" where idShow=%i order by strFileName, idEpisode",tvshow.m_iDbId);
       pDS->query(sql.c_str());
       CStdString showDir(item.GetPath());
 

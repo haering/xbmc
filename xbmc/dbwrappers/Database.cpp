@@ -484,6 +484,7 @@ bool CDatabase::Connect(const std::string &dbName, const DatabaseSettings &dbSet
       }
       CreateDatabase();
     }
+    generateViewsPerUser();
 
     // sqlite3 post connection operations
     if (dbSettings.type.Equals("sqlite3"))

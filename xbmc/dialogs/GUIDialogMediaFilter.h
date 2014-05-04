@@ -26,6 +26,9 @@
 #include "dbwrappers/DatabaseQuery.h"
 #include "settings/dialogs/GUIDialogSettingsManualBase.h"
 #include "utils/DatabaseUtils.h"
+#include "utils/StdString.h"
+#include "video/VideoDatabase.h"
+
 
 class CDbUrl;
 class CSetting;
