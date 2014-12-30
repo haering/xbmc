@@ -6894,7 +6894,7 @@ int CVideoDatabase::GetMusicVideoCount(const CStdString& strWhere)
     if (NULL == m_pDB.get()) return 0;
     if (NULL == m_pDS.get()) return 0;
 
-	CStdString strSQL = StringUtils::Format("select count(1) as nummovies from %s where %s", CVideoDatabase::musicVideoView,strWhere.c_str());
+	CStdString strSQL = StringUtils::Format("select count(1) as nummovies from %s where %s", CVideoDatabase::musicVideoView.c_str(),strWhere.c_str());
     m_pDS->query( strSQL.c_str() );
 
     int iResult = 0;
@@ -7588,7 +7588,7 @@ bool CVideoDatabase::GetRandomMusicVideo(CFileItem* item, int& idSong, const CSt
     if (NULL == m_pDS.get()) return false;
 
     // We don't use PrepareSQL here, as the WHERE clause is already formatted.
-	CStdString strSQL = StringUtils::Format("select * from %s where %s", CVideoDatabase::musicVideoView, strWhere.c_str());
+	CStdString strSQL = StringUtils::Format("select * from %s where %s", CVideoDatabase::musicVideoView.c_str(), strWhere.c_str());
     strSQL += PrepareSQL(" order by RANDOM() limit 1");
     CLog::Log(LOGDEBUG, "%s query = %s", __FUNCTION__, strSQL.c_str());
     // run query
