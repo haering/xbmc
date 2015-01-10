@@ -6101,7 +6101,7 @@ bool CVideoDatabase::GetSeasonsByWhere(const CStdString& strBaseDir, const Filte
       return false;
 
 //<<<<<<< HEAD
-	CStdString strSQL = "SELECT * FROM " + CVideoDatabase::seasonView;
+    CStdString strSQL = "SELECT * FROM " + CVideoDatabase::seasonView+" ";
 /*=======
     CStdString strIn = PrepareSQL("= %i", idShow);
     GetStackedTvShowList(idShow, strIn);
@@ -6494,7 +6494,7 @@ bool CVideoDatabase::GetTvShowsByWhere(const CStdString& strBaseDir, const Filte
 
     int total = -1;
     
-    std::string strSQL = "SELECT %s FROM "+CVideoDatabase::tvShowView;
+    std::string strSQL = "SELECT %s FROM "+CVideoDatabase::tvShowView+" ";
 
     CVideoDbUrl videoUrl;
     std::string strSQLExtra;
@@ -8823,7 +8823,7 @@ void CVideoDatabase::ExportToXML(const CStdString &path, bool singleFiles /* = f
     m_pDS->close();
 
     // repeat for all tvshows
-    sql = "SELECT * FROM "+CVideoDatabase::tvShowView;
+    sql = "SELECT * FROM "+CVideoDatabase::tvShowView+" ";
     m_pDS->query(sql.c_str());
 
     total = m_pDS->num_rows();
