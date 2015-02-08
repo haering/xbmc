@@ -496,7 +496,7 @@ void CVideoDatabase::generateViewsPerUser() {
 			" LEFT JOIN bookmark ON"
 			" bookmark.idFile=episode.idFile AND bookmark.type=1  AND bookmark.idViewer =watchlist.idViewer", VIDEODB_ID_TV_TITLE, VIDEODB_ID_TV_STUDIOS, VIDEODB_ID_TV_PREMIERED, VIDEODB_ID_TV_MPAA, VIDEODB_ID_EPISODE_SEASON, g_advancedSettings.m_databaseVideo.userID.c_str());
 		//  CLog::Log(LOGINFO, episodeview.c_str());
-		//  std::cout << "lÃ¤nge von dem KAcke: " << strlen(episodeview.c_str()) << "  " << episodeview << std::endl;
+		//  std::cout << "länge von dem KAcke: " << strlen(episodeview.c_str()) << "  " << episodeview << std::endl;
 		m_pDS->exec(episodeview.c_str());
 
 
@@ -3316,6 +3316,9 @@ void CVideoDatabase::DeleteTvShow(int idTvShow, bool bKeepId /* = false */)
 
     BeginTransaction();
 
+    set<int> paths;
+    GetPathsForTvShow(idTvShow, paths);
+
     CStdString strSQL=PrepareSQL("SELECT episode.idEpisode FROM episode WHERE episode.idShow=%i",idTvShow);
     m_pDS2->query(strSQL.c_str());
     while (!m_pDS2->eof())
@@ -3341,9 +3344,6 @@ void CVideoDatabase::DeleteTvShow(int idTvShow, bool bKeepId /* = false */)
       strSQL=PrepareSQL("delete from movielinktvshow where idShow=%i", idTvShow);
       m_pDS->exec(strSQL.c_str());
 
-      // TODO: why do we invalidate the path hash here??
-      set<int> paths;
-      GetPathsForTvShow(idTvShow, paths);
       for (set<int>::const_iterator i = paths.begin(); i != paths.end(); ++i)
       {
         std::string path = GetSingleValue(PrepareSQL("SELECT strPath FROM path WHERE idPath=%i", *i));
@@ -3436,6 +3436,11 @@ void CVideoDatabase::DeleteEpisode(int idEpisode, bool bKeepId /* = false */)
     // the ancilliary tables are still purged
     if (!bKeepId)
     {
+      int idFile = GetDbId(PrepareSQL("SELECT idFile FROM episode WHERE idEpisode=%i", idEpisode));
+      std::string path = GetSingleValue(PrepareSQL("SELECT strPath FROM path JOIN files ON files.idPath=path.idPath WHERE files.idFile=%i", idFile));
+      if (!path.empty())
+        InvalidatePathHash(path);
+
       strSQL=PrepareSQL("delete from episode where idEpisode=%i", idEpisode);
       m_pDS->exec(strSQL.c_str());
     }
@@ -4388,7 +4393,7 @@ bool CVideoDatabase::GetStackTimes(const CStdString &filePath, vector<int> &time
 }
 
 /// \brief Sets the stack times for a particular video file
-void CVideoDatabase::SetStackTimes(const CStdString& filePath, vector<int> &times)
+void CVideoDatabase::SetStackTimes(const CStdString& filePath, const vector<int> &times)
 {
   try
   {
@@ -6133,7 +6138,7 @@ bool CVideoDatabase::GetSeasonsByWhere(const CStdString& strBaseDir, const Filte
       videoUrl.AddOption("genreid", idGenre);
     else if (idYear != -1)
       videoUrl.AddOption("year", idYear);
->>>>>>> d50a776... Watchstate fÃ¼r mehrere Clients in einer Datenbank*/
+>>>>>>> d50a776... Watchstate für mehrere Clients in einer Datenbank*/
 
     Filter extFilter = filter;
     if (!BuildSQL(strBaseDir, strSQL, extFilter, strSQL, videoUrl))
@@ -7588,7 +7593,9 @@ bool CVideoDatabase::GetRandomMusicVideo(CFileItem* item, int& idSong, const CSt
     if (NULL == m_pDS.get()) return false;
 
     // We don't use PrepareSQL here, as the WHERE clause is already formatted.
-	CStdString strSQL = StringUtils::Format("select * from %s where %s", CVideoDatabase::musicVideoView.c_str(), strWhere.c_str());
+	CStdString strSQL = StringUtils::Format("select * from %s ", CVideoDatabase::musicVideoView.c_str());
+    if (!strWhere.empty())
+      strSQL += PrepareSQL(" where %s", strWhere.c_str());
     strSQL += PrepareSQL(" order by RANDOM() limit 1");
     CLog::Log(LOGDEBUG, "%s query = %s", __FUNCTION__, strSQL.c_str());
     // run query
