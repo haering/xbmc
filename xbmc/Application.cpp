@@ -248,6 +248,7 @@
 #ifdef HAS_LINUX_NETWORK
 #include "network/GUIDialogAccessPoints.h"
 #endif
+#include "dialogs/GUIDialogSimpleMenu.h"
 
 /* PVR related include Files */
 #include "pvr/PVRManager.h"
@@ -821,6 +822,10 @@ bool CApplication::Create()
     CLog::LogF(LOGFATAL, "Failed to load %s language file, from path: %s", strLanguage.c_str(), strLanguagePath.c_str());
     return false;
   }
+
+#ifdef TARGET_WINDOWS
+  CWIN32Util::SetThreadLocalLocale(true); // enable independent locale for each thread, see https://connect.microsoft.com/VisualStudio/feedback/details/794122
+#endif // TARGET_WINDOWS
 
   // start the AudioEngine
   if (!CAEFactory::StartEngine())
@@ -3881,6 +3886,14 @@ PlayBackRet CApplication::PlayFile(const CFileItem& item, bool bRestart)
     if (XFILE::CPluginDirectory::GetPluginResult(item.GetPath(), item_new))
       return PlayFile(item_new, false);
     return PLAYBACK_FAIL;
+  }
+
+  // a disc image might be Blu-Ray disc
+  if (item.IsBDFile() || item.IsDiscImage())
+  {
+    //check if we must show the simplified bd menu
+    if (!CGUIDialogSimpleMenu::ShowPlaySelection(const_cast<CFileItem&>(item)))
+      return PLAYBACK_CANCELED;
   }
 
 #ifdef HAS_UPNP
