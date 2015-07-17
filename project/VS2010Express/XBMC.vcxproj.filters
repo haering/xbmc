@@ -3104,7 +3104,14 @@
     </ClCompile>
     <ClCompile Include="..\..\xbmc\cores\Transcoder\Transcoder.cpp">
       <Filter>cores\Transcoder</Filter>
-    </ClCompile>  </ItemGroup>
+    </ClCompile>
+    <ClCompile Include="..\..\xbmc\cores\Transcoder\TranscodingOptions.cpp">
+      <Filter>cores\Transcoder</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\xbmc\cores\Transcoder\JSONTranscodingOptions.cpp">
+      <Filter>cores\Transcoder</Filter>
+    </ClCompile>
+  </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\xbmc\win32\pch.h">
       <Filter>win32</Filter>
@@ -6001,6 +6008,12 @@
       <Filter>interfaces\json-rpc</Filter>
     </ClInclude>
     <ClInclude Include="..\..\xbmc\cores\Transcoder\Transcoder.h">
+      <Filter>cores\Transcoder</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\xbmc\cores\Transcoder\TranscodingOptions.h">
+      <Filter>cores\Transcoder</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\xbmc\cores\Transcoder\JSONTranscodingOptions.h">
       <Filter>cores\Transcoder</Filter>
     </ClInclude>
   </ItemGroup>
