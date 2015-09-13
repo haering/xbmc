@@ -137,10 +137,12 @@ private:
   bool m_bFoundVideoStream;
   /** Index of the input video stream in the input format context.*/
   unsigned int m_iVideoStreamIndex;
+  int64_t m_iVideoStreamDuration;
   /** True iff the input file contains an audio stream that we can decode.*/
   bool m_bFoundAudioStream;
   /** Index of the input audio stream in the input format context.*/
   unsigned int m_iAudioStreamIndex;
+  int64_t m_iAudioStreamDuration;
   /** Width of the input video stream.*/
   int m_iVideoWidth;
   /** Height of the input video stream.*/

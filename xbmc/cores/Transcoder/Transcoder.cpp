@@ -30,7 +30,7 @@ CTranscoder::CTranscoder()
   : CThread(this, "Transcoder")
   , m_TransOpts()
 {
-  CLog::Log(LOGDEBUG, "CTranscoder::CTranscoder() was called.\n");
+  CLog::Log(LOGDEBUG, "CTranscoder::CTranscoder() was called.");
   packet.data = NULL;
   packet.size = 0;
   frame = NULL;
@@ -52,7 +52,7 @@ CTranscoder::CTranscoder()
 
 CTranscoder::~CTranscoder()
 {
-  CLog::Log(LOGDEBUG, "CTranscoder::~CTranscoder() was called.\n");
+  CLog::Log(LOGDEBUG, "CTranscoder::~CTranscoder() was called.");
   CloseSwsContext();
   CloseOutputFile();
   CloseInputFile();
@@ -158,7 +158,7 @@ int CTranscoder::CreateMediaPlaylist(const char* filename)
   }
 
   // Precompute number of total segments
-  m_iTotalHLSSegmentNumber = (m_iDuration / AV_TIME_BASE) / m_TransOpts.GetSegmentDuration();
+  m_iTotalHLSSegmentNumber = (m_iDuration / AV_TIME_BASE) / m_TransOpts.GetSegmentDuration() + 1;
 
   // Write contents
   std::string playlistHeader = "#EXTM3U\n";
@@ -177,6 +177,7 @@ int CTranscoder::CreateMediaPlaylist(const char* filename)
     if (s == m_iTotalHLSSegmentNumber)
     {
       segmentDuration = (m_iDuration / AV_TIME_BASE) % m_TransOpts.GetSegmentDuration();
+      segmentDuration++;
     }
     else
     {
@@ -212,7 +213,7 @@ int CTranscoder::ShouldStartNewSegment(int64_t time_stamp, const AVRational& tim
     ret = 0;
   }
   else if (time_stamp * time_base.num / time_base.den
-    > m_iCurrentHLSSegmentNumber * m_TransOpts.GetSegmentDuration())
+    >= m_iCurrentHLSSegmentNumber * m_TransOpts.GetSegmentDuration())
   {
     m_iCurrentHLSSegmentNumber++;
     ret = 1;
@@ -243,13 +244,13 @@ int CTranscoder::OpenInputFile(const char *filename)
 
 	if ((ret = avformat_open_input(&ifmt_ctx, filename, NULL, NULL)) < 0)
   {
-    CLog::Log(LOGERROR, "CTranscoder::OpenInputFile(): Cannot open input file '%s'\n", filename);
+    CLog::Log(LOGERROR, "CTranscoder::OpenInputFile(): Cannot open input file '%s'.", filename);
 		return ret;
 	}
 
 	if ((ret = avformat_find_stream_info(ifmt_ctx, NULL)) < 0)
   {
-    CLog::Log(LOGERROR, "CTranscoder::OpenInputFile(): Cannot find stream information\n");
+    CLog::Log(LOGERROR, "CTranscoder::OpenInputFile(): Cannot find stream information.");
 		return ret;
 	}
 
@@ -280,13 +281,14 @@ int CTranscoder::OpenInputFile(const char *filename)
       AVCodecID codec_id = codec_ctx->codec_id;
       if ((ret = avcodec_open2(codec_ctx, avcodec_find_decoder(codec_id), NULL)) < 0)
       {
-        CLog::Log(LOGERROR, "CTranscoder::OpenInputFile(): Failed to open decoder for stream #%u\n", i);
+        CLog::Log(LOGERROR, "CTranscoder::OpenInputFile(): Failed to open decoder for stream #%u.", i);
 				return ret;
 			}
       if (!m_bFoundVideoStream && codec_type == AVMEDIA_TYPE_VIDEO)
       {
         m_bFoundVideoStream = true;
         m_iVideoStreamIndex = i;
+        m_iVideoStreamDuration = stream->duration;
         m_iVideoWidth = codec_ctx->width;
         m_iVideoHeight = codec_ctx->height;
         m_eVideoPixelFormat = codec_ctx->pix_fmt;
@@ -295,6 +297,7 @@ int CTranscoder::OpenInputFile(const char *filename)
       {
         m_bFoundAudioStream = true;
         m_iAudioStreamIndex = i;
+        m_iAudioStreamDuration = stream->duration;
       }
 		}
 	}
@@ -325,7 +328,7 @@ int CTranscoder::OpenOutputFile(const char *filename)
 	avformat_alloc_output_context2(&ofmt_ctx, NULL, NULL, filename);
 	if (!ofmt_ctx)
   {
-    CLog::Log(LOGERROR, "CTranscoder::OpenOutputFile: Could not create output context\n");
+    CLog::Log(LOGERROR, "CTranscoder::OpenOutputFile: Could not create output context.");
 		return AVERROR_UNKNOWN;
 	}
 
@@ -341,7 +344,7 @@ int CTranscoder::OpenOutputFile(const char *filename)
   {
     if (!(out_stream = avformat_new_stream(ofmt_ctx, NULL)))
     {
-      CLog::Log(LOGERROR, "CTranscoder::OpenOutputFile: Failed allocating output stream\n");
+      CLog::Log(LOGERROR, "CTranscoder::OpenOutputFile: Failed allocating output stream.");
       return AVERROR_UNKNOWN;
     }
 
@@ -354,7 +357,7 @@ int CTranscoder::OpenOutputFile(const char *filename)
     {
       if ((ret = OpenVideoEncoder(enc_ctx, dec_ctx)) != 0)
       {
-        CLog::Log(LOGERROR, "CTranscoder::OpenOutputFile(): Can't open video encoder for stream #%d", i);
+        CLog::Log(LOGERROR, "CTranscoder::OpenOutputFile(): Can't open video encoder for stream #%d.", i);
         return ret;
       }
     }
@@ -362,7 +365,7 @@ int CTranscoder::OpenOutputFile(const char *filename)
     {
       if ((ret = OpenAudioEncoder(enc_ctx, dec_ctx)) != 0)
       {
-        CLog::Log(LOGERROR, "CTranscoder::OpenOutputFile(): Can't open audio encoder for stream #%d", i);
+        CLog::Log(LOGERROR, "CTranscoder::OpenOutputFile(): Can't open audio encoder for stream #%d.", i);
         return ret;
       }
     }
@@ -390,7 +393,7 @@ int CTranscoder::OpenOutputFile(const char *filename)
   {
     if ((ret = avio_open(&ofmt_ctx->pb, filename, AVIO_FLAG_WRITE)) < 0)
     {
-      CLog::Log(LOGERROR, "CTranscoder::OpenOutputFile(): Could not open output file '%s'", filename);
+      CLog::Log(LOGERROR, "CTranscoder::OpenOutputFile(): Could not open output file '%s'.", filename);
 			return ret;
 		}
 	}
@@ -778,7 +781,7 @@ int CTranscoder::FilterEncodeWriteFrame(AVFrame *frame, unsigned int stream_inde
 	ret = av_buffersrc_add_frame_flags(filter_ctx[stream_index].buffersrc_ctx,
 		frame, 0);
 	if (ret < 0) {
-    CLog::Log(LOGERROR, "Error while feeding the filtergraph\n");
+    CLog::Log(LOGERROR, "Error while feeding the filtergraph.");
 		return ret;
 	}
 
@@ -898,7 +901,7 @@ void CTranscoder::Run()
   CLog::Log(LOGDEBUG, "CTranscoder::Run() was called.");
   
   if (path.empty()) {
-    CLog::Log(LOGERROR, "CTranscoder::Run(): Path to input file must not be empty.\n");
+    CLog::Log(LOGERROR, "CTranscoder::Run(): Path to input file must not be empty.");
     return;
   }
 
@@ -946,7 +949,7 @@ void CTranscoder::Run()
     {
       if (m_bStop)
       {
-        CLog::Log(LOGDEBUG, "CTranscoder::Run(): Transcoder asked to stop!\n");
+        CLog::Log(LOGDEBUG, "CTranscoder::Run(): Transcoder asked to stop!");
       }
       if ((ret = av_read_frame(ifmt_ctx, &packet)) < 0)
       {
@@ -987,7 +990,7 @@ void CTranscoder::Run()
         }
         if (ret < 0) {
           av_frame_free(&frame);
-          CLog::Log(LOGERROR, "CTranscoder::Run(): Decoding failed\n");
+          CLog::Log(LOGERROR, "CTranscoder::Run(): Decoding failed.");
           break;
         }
 
@@ -1141,7 +1144,7 @@ void CTranscoder::Run()
       }
       if (ret < 0) {
         av_frame_free(&frame);
-        CLog::Log(LOGERROR, "CTranscoder::Run(): Decoding failed\n");
+        CLog::Log(LOGERROR, "CTranscoder::Run(): Decoding failed.");
         break;
       }
 
@@ -1206,12 +1209,12 @@ end:
 
 void CTranscoder::OnStartup()
 {
-  CLog::Log(LOGDEBUG, "CTranscoder::onStartup() was called.\n");
+  CLog::Log(LOGDEBUG, "CTranscoder::onStartup() was called.");
 }
 
 void CTranscoder::OnExit()
 {
-  CLog::Log(LOGDEBUG, "CTranscoder::onExit() was called.\n");
+  CLog::Log(LOGDEBUG, "CTranscoder::onExit() was called.");
 }
 
 void CTranscoder::SetTranscodingOptions(TranscodingOptions transOpts)
