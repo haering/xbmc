@@ -51,12 +51,14 @@ public:
     ca.clear();
     capath.clear();
     ciphers.clear();
+    userID = "1";
     compression = false;
   };
   std::string type;
   std::string host;
   std::string port;
   std::string user;
+  std::string userID;
   std::string pass;
   std::string name;
   std::string key;
