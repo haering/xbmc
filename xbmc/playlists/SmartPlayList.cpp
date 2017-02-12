@@ -18,6 +18,13 @@
 #include "filesystem/File.h"
 #include "filesystem/SmartPlaylistDirectory.h"
 #include "guilib/LocalizeStrings.h"
+#include "settings/AdvancedSettings.h"
+#include "settings/MediaSettings.h"
+#include "settings/MediaSourceSettings.h"
+#include "settings/Settings.h"
+#include "settings/SettingsComponent.h"
+#include "ServiceBroker.h"
+#include "utils/CharsetConverter.h"
 #include "utils/DatabaseUtils.h"
 #include "utils/JSONVariantParser.h"
 #include "utils/JSONVariantWriter.h"
@@ -28,6 +35,7 @@
 #include "utils/URIUtils.h"
 #include "utils/Variant.h"
 #include "utils/XMLUtils.h"
+#include "video/VideoDatabase.h"
 
 using namespace XFILE;
 
@@ -715,14 +723,14 @@ std::string CSmartPlaylistRule::GetBooleanQuery(const std::string &negate, const
   if (strType == "movies")
   {
     if (m_field == FieldInProgress)
-      return "movie_view.idFile " + negate + " IN (SELECT DISTINCT idFile FROM bookmark WHERE type = 1)";
+      return "movie_view.idFile " + negate + " IN (SELECT DISTINCT idFile FROM bookmark WHERE type = 1 AND bookmark.idViewer ="+CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_databaseVideo.userID+")";
     else if (m_field == FieldTrailer)
       return negate + GetField(m_field, strType) + "!= ''";
   }
   else if (strType == "episodes")
   {
     if (m_field == FieldInProgress)
-      return "episode_view.idFile " + negate + " IN (SELECT DISTINCT idFile FROM bookmark WHERE type = 1)";
+      return "episode_view.idFile " + negate + " IN (SELECT DISTINCT idFile FROM bookmark WHERE type = 1AND bookmark.idViewer ="+CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_databaseVideo.userID+")";
   }
   else if (strType == "tvshows")
   {
@@ -730,7 +738,7 @@ std::string CSmartPlaylistRule::GetBooleanQuery(const std::string &negate, const
       return negate + " ("
                           "(tvshow_view.watchedcount > 0 AND tvshow_view.watchedcount < tvshow_view.totalCount) OR "
                           "(tvshow_view.watchedcount = 0 AND EXISTS "
-                            "(SELECT 1 FROM episode_view WHERE episode_view.idShow = " + GetField(FieldId, strType) + " AND episode_view.resumeTimeInSeconds > 0)"
+                            "(SELECT 1 FROM "+CVideoDatabase::episodeView+" WHERE episode_view.idShow = " + GetField(FieldId, strType) + " AND episode_view.resumeTimeInSeconds > 0)"
                           ")"
                        ")";
   }
@@ -843,7 +851,7 @@ std::string CSmartPlaylistRule::FormatWhereClause(const std::string &negate, con
   }
   else if (strType == "movies")
   {
-    table = "movie_view";
+    table = CVideoDatabase::movieView;
 
     if (m_field == FieldGenre)
       query = negate + FormatLinkQuery("genre", "genre", MediaTypeMovie, GetField(FieldId, strType), parameter);
@@ -864,7 +872,7 @@ std::string CSmartPlaylistRule::FormatWhereClause(const std::string &negate, con
   }
   else if (strType == "musicvideos")
   {
-    table = "musicvideo_view";
+    table = CVideoDatabase::musicVideoView;
 
     if (m_field == FieldGenre)
       query = negate + FormatLinkQuery("genre", "genre", MediaTypeMusicVideo, GetField(FieldId, strType), parameter);
@@ -881,7 +889,7 @@ std::string CSmartPlaylistRule::FormatWhereClause(const std::string &negate, con
   }
   else if (strType == "tvshows")
   {
-    table = "tvshow_view";
+    table = CVideoDatabase::tvShowView;
 
     if (m_field == FieldGenre)
       query = negate + FormatLinkQuery("genre", "genre", MediaTypeTvShow, GetField(FieldId, strType), parameter);
@@ -902,7 +910,7 @@ std::string CSmartPlaylistRule::FormatWhereClause(const std::string &negate, con
   }
   else if (strType == "episodes")
   {
-    table = "episode_view";
+    table = CVideoDatabase::episodeView;
 
     if (m_field == FieldGenre)
       query = negate + FormatLinkQuery("genre", "genre", MediaTypeTvShow, (table + ".idShow").c_str(), parameter);
