@@ -70,6 +70,8 @@ enum VideoDbDetails
   VideoDbDetailsAll      = 0xFF
 } ;
 
+#define COUNT_WATCHLIST_PLAYCOUNT "count(watchlist.playCount)"
+
 // these defines are based on how many columns we have and which column certain data is going to be in
 // when we do GetDetailsForMovie()
 #define VIDEODB_MAX_COLUMNS 24
@@ -388,6 +390,18 @@ const struct SDbTableOffsets DbMusicVideoOffsets[] =
 class CVideoDatabase : public CDatabase
 {
 public:
+
+
+	static std::string	movieView;
+	static std::string	musicVideoView;
+	static std::string	tvShowView;
+	static std::string	episodeView;
+	static std::string	seasonView;
+	static std::string	tvshowcountsView;
+	static bool			initialized;
+	static std::string	userID;
+	
+
 
   class CActor    // used for actor retrieval for non-master users
   {
@@ -952,11 +966,13 @@ protected:
   std::string GetValueString(const CVideoInfoTag &details, int min, int max, const SDbTableOffsets *offsets) const;
 
 private:
+  static bool createdViewPerUser;
   void CreateTables() override;
   void CreateAnalytics() override;
   void UpdateTables(int version) override;
   void CreateLinkIndex(const char *table);
   void CreateForeignLinkIndex(const char *table, const char *foreignkey);
+  virtual void generateViewsPerUser();
 
   /*! \brief (Re)Create the generic database views for movies, tvshows,
      episodes and music videos
