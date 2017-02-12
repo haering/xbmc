@@ -192,6 +192,8 @@ protected:
    */
   virtual void CreateTables()=0;
 
+  virtual void generateViewsPerUser() {};
+
   /* \brief Create views, indices and triggers for the current database schema.
    Will be called on database creation and database update.
    */
