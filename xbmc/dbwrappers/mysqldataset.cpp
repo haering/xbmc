@@ -1620,6 +1620,7 @@ bool MysqlDataset::query(const std::string &query) {
         case MYSQL_TYPE_STRING:
         case MYSQL_TYPE_VAR_STRING:
         case MYSQL_TYPE_VARCHAR:
+		case MYSQL_TYPE_DATETIME:
           if (row[i] != NULL) v.set_asString((const char *)row[i] );
           break;
         case MYSQL_TYPE_TINY_BLOB:

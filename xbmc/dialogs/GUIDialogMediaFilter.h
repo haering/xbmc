@@ -18,6 +18,8 @@
 #include "settings/dialogs/GUIDialogSettingsManualBase.h"
 #include "settings/lib/SettingType.h"
 #include "utils/DatabaseUtils.h"
+#include "video/VideoDatabase.h"
+
 
 class CDbUrl;
 class CSetting;
