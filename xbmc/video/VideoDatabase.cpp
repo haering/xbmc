@@ -653,11 +653,11 @@ void CVideoDatabase::generateViewsPerUser() {
 			" LEFT JOIN watchlist ON"
 			" watchlist.idFile=episode.idFile AND watchlist.idViewer = %s "
 			" LEFT JOIN bookmark ON"
-			" bookmark.idFile=episode.idFile AND bookmark.type=1  AND bookmark.idViewer =watchlist.idViewer "
+			" bookmark.idFile=episode.idFile AND bookmark.type=1  AND bookmark.idViewer = %s "
 			"  LEFT JOIN rating ON"
 			"    rating.rating_id=episode.c%02d"
 			"  LEFT JOIN uniqueid ON"
-			"    uniqueid.uniqueid_id=episode.c%02d", VIDEODB_ID_TV_TITLE, VIDEODB_ID_TV_GENRE,	VIDEODB_ID_TV_STUDIOS, VIDEODB_ID_TV_PREMIERED,	VIDEODB_ID_TV_MPAA, g_advancedSettings.m_databaseVideo.userID.c_str(), VIDEODB_ID_EPISODE_RATING_ID, VIDEODB_ID_EPISODE_IDENT_ID);
+			"    uniqueid.uniqueid_id=episode.c%02d", VIDEODB_ID_TV_TITLE, VIDEODB_ID_TV_GENRE,	VIDEODB_ID_TV_STUDIOS, VIDEODB_ID_TV_PREMIERED,	VIDEODB_ID_TV_MPAA, g_advancedSettings.m_databaseVideo.userID.c_str(), g_advancedSettings.m_databaseVideo.userID.c_str(), VIDEODB_ID_EPISODE_RATING_ID, VIDEODB_ID_EPISODE_IDENT_ID);
 		m_pDS->exec(episodeview);
 
 		CLog::Log(LOGINFO, "create seasonview");
@@ -710,7 +710,7 @@ void CVideoDatabase::generateViewsPerUser() {
 			" LEFT JOIN watchlist ON"
 			"    watchlist.idFile=musicvideo.idFile AND watchlist.idViewer = " + g_advancedSettings.m_databaseVideo.userID +
 			"  LEFT JOIN bookmark ON"
-			"    bookmark.idFile=musicvideo.idFile AND bookmark.type=1  AND bookmark.idViewer = watchlist.idViewer ");
+			"    bookmark.idFile=musicvideo.idFile AND bookmark.type=1  AND bookmark.idViewer = " + g_advancedSettings.m_databaseVideo.userID );
 
 		CLog::Log(LOGINFO, "create movie_view");
 		m_pDS->exec("DROP VIEW IF EXISTS movie_view" + g_advancedSettings.m_databaseVideo.userID);
@@ -740,7 +740,7 @@ void CVideoDatabase::generateViewsPerUser() {
 			" LEFT JOIN watchlist ON"
 			"    watchlist.idFile=movie.idFile AND watchlist.idViewer = " + g_advancedSettings.m_databaseVideo.userID +
 			"  LEFT JOIN bookmark ON"
-			"    bookmark.idFile=movie.idFile AND bookmark.type=1 AND bookmark.idViewer = watchlist.idViewer "
+			"    bookmark.idFile=movie.idFile AND bookmark.type=1 AND bookmark.idViewer = " + g_advancedSettings.m_databaseVideo.userID +
 			"  LEFT JOIN rating ON"
 			"    rating.rating_id=movie.c%02d"
 			"  LEFT JOIN uniqueid ON"
@@ -2358,8 +2358,8 @@ bool CVideoDatabase::GetFileInfo(const std::string& strFilenameAndPath, CVideoIn
     std::string sql = PrepareSQL("SELECT * FROM files "
                                 "JOIN path ON path.idPath = files.idPath "
                                 "LEFT JOIN bookmark ON bookmark.idFile = files.idFile AND bookmark.type = %i AND bookmark.idViewer = %s "
-								"LEFT JOIN watchlist ON watchlist.idFile=files.idFile AND watchlist.idViewer = bookmark.idViewer "
-                                "WHERE files.idFile = %i", CBookmark::RESUME, g_advancedSettings.m_databaseVideo.userID.c_str(), idFile);
+								"LEFT JOIN watchlist ON watchlist.idFile=files.idFile AND watchlist.idViewer = %s "
+                                "WHERE files.idFile = %i", CBookmark::RESUME, g_advancedSettings.m_databaseVideo.userID.c_str(), g_advancedSettings.m_databaseVideo.userID.c_str(), idFile);
     if (!m_pDS->query(sql))
       return false;
 
@@ -5451,7 +5451,7 @@ bool CVideoDatabase::GetPlayCounts(const std::string &strPath, CFileItemList &it
       "  LEFT JOIN bookmark ON"
       "    files.idFile = bookmark.idFile AND bookmark.type = %i AND bookmark.idViewer = " + g_advancedSettings.m_databaseVideo.userID+
       " LEFT JOIN watchlist ON"
-      "    watchlist.idFile=files.idFile AND watchlist.idViewer = bookmark.idViewer "
+      "    watchlist.idFile=files.idFile AND watchlist.idViewer =  " + g_advancedSettings.m_databaseVideo.userID +
       "  WHERE files.idPath=%i", (int)CBookmark::RESUME, pathID);
 
     if (RunQuery(sql) <= 0)
