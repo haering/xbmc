@@ -38,6 +38,10 @@
 
 #include "platform/linux/RBP.h"
 
+#ifndef FF_BUG_GMC_UNSUPPORTED
+#define FF_BUG_GMC_UNSUPPORTED 0
+#endif
+
 using namespace KODI::MESSAGING;
 using namespace MMAL;
 
@@ -333,6 +337,11 @@ bool CMMALVideo::SendCodecConfigData()
   return true;
 }
 
+bool CMMALVideo::SupportsExtention()
+{
+  return CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(CSettings::SETTING_VIDEOPLAYER_SUPPORTMVC);
+}
+
 bool CMMALVideo::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options)
 {
   CSingleLock lock(m_sharedSection);
@@ -343,6 +352,8 @@ bool CMMALVideo::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options)
     return false;
   // we always qualify even if DVDFactoryCodec does this too.
   if (!CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(CSettings::SETTING_VIDEOPLAYER_USEMMAL) || (hints.codecOptions & CODEC_FORCE_SOFTWARE))
+    return false;
+  if (hints.workaround_bugs & FF_BUG_GMC_UNSUPPORTED)
     return false;
 
   std::list<EINTERLACEMETHOD> deintMethods;
@@ -371,6 +382,7 @@ bool CMMALVideo::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options)
   switch (hints.codec)
   {
     case AV_CODEC_ID_H264:
+    case AV_CODEC_ID_H264_MVC:
       // H.264
       switch (hints.profile)
       {
@@ -382,10 +394,13 @@ bool CMMALVideo::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options)
       }
       m_codingType = MMAL_ENCODING_H264;
       m_pFormatName = "mmal-h264";
-      if (CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(CSettings::SETTING_VIDEOPLAYER_SUPPORTMVC))
+      if ((hints.codec_tag == MKTAG('M', 'V', 'C', '1') || hints.codec_tag == MKTAG('A', 'M', 'V', 'C')) &&
+          SupportsExtention())
       {
         m_codingType = MMAL_ENCODING_MVC;
         m_pFormatName= "mmal-mvc";
+        if (hints.stereo_mode.empty())
+          hints.stereo_mode = "block_lr";
       }
     break;
     case AV_CODEC_ID_H263:

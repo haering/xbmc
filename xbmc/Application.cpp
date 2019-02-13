@@ -1303,6 +1303,7 @@ bool CApplication::LoadSkin(const std::string& skinID)
   CServiceBroker::GetGUI()->GetWindowManager().AddMsgTarget(this);
   CServiceBroker::GetGUI()->GetWindowManager().AddMsgTarget(&CServiceBroker::GetPlaylistPlayer());
   CServiceBroker::GetGUI()->GetWindowManager().AddMsgTarget(&g_fontManager);
+  CServiceBroker::GetGUI()->GetWindowManager().AddMsgTarget(&CServiceBroker::GetGUI()->GetStereoscopicsManager());
   CServiceBroker::GetGUI()->GetWindowManager().SetCallback(*this);
   //@todo should be done by GUIComponents
   CServiceBroker::GetGUI()->GetWindowManager().Initialize();
@@ -2378,7 +2379,7 @@ void CApplication::FrameMove(bool processEvents, bool processGUI)
 
     // This code reduces rendering fps of the GUI layer when playing videos in fullscreen mode
     // it makes only sense on architectures with multiple layers
-    if (CServiceBroker::GetWinSystem()->GetGfxContext().IsFullScreenVideo() && !m_appPlayer.IsPausedPlayback() && m_appPlayer.IsRenderingVideoLayer())
+    if (m_appPlayer.IsPlayingVideo() && !m_appPlayer.IsPausedPlayback() && m_appPlayer.IsRenderingVideoLayer())
       fps = CServiceBroker::GetSettingsComponent()->GetSettings()->GetInt(CSettings::SETTING_VIDEOPLAYER_LIMITGUIUPDATE);
 
     unsigned int now = XbmcThreads::SystemClockMillis();
@@ -4825,4 +4826,14 @@ bool CApplication::NotifyActionListeners(const CAction &action) const
   }
 
   return false;
+}
+
+bool CApplication::ScreenSaverDisablesAutoScrolling()
+{
+  bool onBlackDimScreenSaver = IsInScreenSaver() &&
+      (m_screensaverIdInUse == "screensaver.xbmc.builtin.dim" ||
+      m_screensaverIdInUse == "screensaver.xbmc.builtin.black");
+  bool openingStreams = m_appPlayer.IsPlaying() && CServiceBroker::GetGUI()->GetWindowManager().IsWindowActive(WINDOW_DIALOG_BUSY);
+
+  return onBlackDimScreenSaver || openingStreams;
 }
