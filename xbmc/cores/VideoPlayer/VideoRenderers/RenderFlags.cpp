@@ -66,7 +66,7 @@ unsigned int GetFlagsStereoMode(const std::string& mode)
   static std::map<std::string, unsigned int> convert;
   if(convert.empty())
   {
-    convert["mono"]                   = 0u;
+    convert[""]                       = 0u;
     convert["left_right"]             = CONF_FLAGS_STEREO_MODE_SBS | CONF_FLAGS_STEREO_CADANCE_LEFT_RIGHT;
     convert["bottom_top"]             = CONF_FLAGS_STEREO_MODE_TAB | CONF_FLAGS_STEREO_CADANCE_RIGHT_LEFT;
     convert["top_bottom"]             = CONF_FLAGS_STEREO_MODE_TAB | CONF_FLAGS_STEREO_CADANCE_LEFT_RIGHT;
@@ -80,9 +80,34 @@ unsigned int GetFlagsStereoMode(const std::string& mode)
     convert["right_left"]             = CONF_FLAGS_STEREO_MODE_SBS | CONF_FLAGS_STEREO_CADANCE_RIGHT_LEFT;
     convert["anaglyph_green_magenta"] = 0u;
     convert["anaglyph_yellow_blue"]   = 0u;
-    convert["block_lr"]               = 0u;
-    convert["block_rl"]               = 0u;
+    convert["block_lr"]               = CONF_FLAGS_STEREO_CADANCE_LEFT_RIGHT;
+    convert["block_rl"]               = CONF_FLAGS_STEREO_CADANCE_RIGHT_LEFT;
   }
+  return convert[mode];
+}
+
+std::string InvertStereoMode(const std::string& mode)
+{
+  static std::map<std::string, std::string> convert;
+  if(convert.empty())
+  {
+    convert[""]                       = "";
+    convert["left_right"]             = "right_left";
+    convert["bottom_top"]             = "top_bottom";
+    convert["top_bottom"]             = "bottom_top";
+    convert["checkerboard_rl"]        = "checkerboard_lr";
+    convert["checkerboard_lr"]        = "checkerboard_rl";
+    convert["row_interleaved_rl"]     = "row_interleaved_lr";
+    convert["row_interleaved_lr"]     = "row_interleaved_rl";
+    convert["col_interleaved_rl"]     = "col_interleaved_lr";
+    convert["col_interleaved_lr"]     = "col_interleaved_rl";
+    convert["right_left"]             = "left_right";
+    convert["block_lr"]               = "block_rl";
+    convert["block_rl"]               = "block_lr";
+  }
+  // if the format is not known then leave it as it is
+  if (convert.count(mode) == 0)
+    return mode;
   return convert[mode];
 }
 

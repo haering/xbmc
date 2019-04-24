@@ -2392,7 +2392,7 @@ void CApplication::FrameMove(bool processEvents, bool processGUI)
 
     // This code reduces rendering fps of the GUI layer when playing videos in fullscreen mode
     // it makes only sense on architectures with multiple layers
-    if (CServiceBroker::GetWinSystem()->GetGfxContext().IsFullScreenVideo() && !m_appPlayer.IsPausedPlayback() && m_appPlayer.IsRenderingVideoLayer())
+    if (m_appPlayer.IsPlayingVideo() && !m_appPlayer.IsPausedPlayback() && m_appPlayer.IsRenderingVideoLayer())
       fps = CServiceBroker::GetSettingsComponent()->GetSettings()->GetInt(CSettings::SETTING_VIDEOPLAYER_LIMITGUIUPDATE);
 
     unsigned int now = XbmcThreads::SystemClockMillis();
@@ -4848,4 +4848,14 @@ bool CApplication::NotifyActionListeners(const CAction &action) const
   }
 
   return false;
+}
+
+bool CApplication::ScreenSaverDisablesAutoScrolling()
+{
+  bool onBlackDimScreenSaver = IsInScreenSaver() &&
+      (m_screensaverIdInUse == "screensaver.xbmc.builtin.dim" ||
+      m_screensaverIdInUse == "screensaver.xbmc.builtin.black");
+  bool openingStreams = m_appPlayer.IsPlaying() && CServiceBroker::GetGUI()->GetWindowManager().IsWindowActive(WINDOW_DIALOG_BUSY);
+
+  return onBlackDimScreenSaver || openingStreams;
 }
