@@ -17,6 +17,7 @@
 #include "DVDCodecs/Video/DVDVideoCodecFFmpeg.h"
 #include "cores/VideoPlayer/Interface/Addon/DemuxPacket.h"
 #include "cores/VideoPlayer/Interface/Addon/TimingConstants.h"
+#include "cores/VideoPlayer/VideoRenderers/RenderFlags.h"
 #include "windowing/GraphicContext.h"
 #include <sstream>
 #include <iomanip>
@@ -183,7 +184,7 @@ void CVideoPlayerVideo::OpenStream(CDVDStreamInfo &hint, CDVDVideoCodec* codec)
   }
 
   // use aspect in stream if available
-  if (hint.forced_aspect)
+  if (hint.forced_aspect && !std::isnan(hint.aspect))
     m_fForcedAspectRatio = static_cast<float>(hint.aspect);
   else
     m_fForcedAspectRatio = 0.0f;
@@ -698,9 +699,11 @@ bool CVideoPlayerVideo::ProcessDecoderOutput(double &frametime, double &pts)
           break;
         default:
           stereoMode = m_hints.stereo_mode;
+          if (m_processInfo.GetVideoSettings().m_StereoInvert)
+            stereoMode = InvertStereoMode(stereoMode);
           break;
       }
-      if (!stereoMode.empty() && stereoMode != "mono")
+      if (!stereoMode.empty())
       {
         m_picture.stereoMode = stereoMode;
       }
@@ -930,10 +933,13 @@ CVideoPlayerVideo::EOutputState CVideoPlayerVideo::OutputPicture(const VideoPict
 
 std::string CVideoPlayerVideo::GetPlayerInfo()
 {
+  int width, height;
+  m_processInfo.GetVideoDimensions(width, height);
   std::ostringstream s;
   s << "vq:"   << std::setw(2) << std::min(99, m_processInfo.GetLevelVQ()) << "%";
   s << ", Mb/s:" << std::fixed << std::setprecision(2) << (double)GetVideoBitrate() / (1024.0*1024.0);
-  s << ", fr:"     << std::fixed << std::setprecision(3) << m_fFrameRate;
+  s << ", dc:"   << m_processInfo.GetVideoDecoderName().c_str();
+  s << ", " << width << "x" << height << "[" << std::setprecision(2) << m_processInfo.GetVideoDAR() << "]@" << std::fixed << std::setprecision(3) << m_processInfo.GetVideoFps() << ", deint:" << m_processInfo.GetVideoDeintMethod();
   s << ", drop:" << m_iDroppedFrames;
   s << ", skip:" << m_renderManager.GetSkippedFrames();
 

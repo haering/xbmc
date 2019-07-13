@@ -3134,7 +3134,7 @@ void CVideoPlayer::Pause()
 
 bool CVideoPlayer::HasVideo() const
 {
-  return m_HasVideo;
+  return m_HasVideo || GetVideoStream() >= 0;
 }
 
 bool CVideoPlayer::HasAudio() const
@@ -3767,6 +3767,10 @@ bool CVideoPlayer::OpenVideoStream(CDVDStreamInfo& hint, bool reset)
       return false;
 
     player->SendMessage(new CDVDMsgBool(CDVDMsg::GENERAL_PAUSE, m_displayLost), 1);
+
+    const std::shared_ptr<CDVDInputStream::IExtentionStream>  pExt = std::dynamic_pointer_cast<CDVDInputStream::IExtentionStream>(m_pInputStream);
+    if (pExt && !static_cast<IDVDStreamPlayerVideo*>(player)->SupportsExtention())
+      pExt->DisableExtention();
 
     // look for any EDL files
     m_Edl.Clear();
@@ -5102,6 +5106,16 @@ void CVideoPlayer::GetVideoStreamInfo(int streamId, VideoStreamInfo &info)
   info.videoAspectRatio = s.aspect_ratio;
   info.stereoMode = s.stereo_mode;
   info.flags = s.flags;
+
+  if (info.stereoMode.empty())
+  {
+    CGUIComponent *gui = CServiceBroker::GetGUI();
+    if (gui != nullptr)
+    {
+      const CStereoscopicsManager &stereoscopicsManager = gui->GetStereoscopicsManager();
+      info.stereoMode = stereoscopicsManager.DetectStereoModeByString(s.filename);
+    }
+  }
 }
 
 int CVideoPlayer::GetVideoStreamCount() const

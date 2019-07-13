@@ -43,7 +43,6 @@ protected:
   bool                      m_stalled;
   IDVDStreamPlayer::ESyncState m_syncState;
   bool                      m_flush;
-  std::string               m_codecname;
   std::atomic_bool          m_bAbortOutput;
   double                    m_iSubtitleDelay;
   bool                      m_bRenderSubs;
@@ -86,6 +85,7 @@ public:
   bool IsStalled() const                            override { return m_stalled;  }
   bool IsEOS() override;
   void CloseStream(bool bWaitForBuffers) override;
+  bool SupportsExtention() const;
   void Output(double pts, bool bDropPacket);
   bool StepFrame();
   void Flush(bool sync) override;
