@@ -255,7 +255,7 @@ void CVideoDatabase::CreateAnalytics()
 
   CLog::Log(LOGINFO, "%s - creating indices", __FUNCTION__);
   m_pDS->exec("CREATE INDEX ix_bookmark ON bookmark (idFile, type)");
-  m_pDS->exec("CREATE UNIQUE INDEX ix_settings ON settings ( idFile )\n");
+  m_pDS->exec("CREATE UNIQUE INDEX ix_settings ON settings ( idFile, userID )\n");
   m_pDS->exec("CREATE UNIQUE INDEX ix_stacktimes ON stacktimes ( idFile )\n");
   m_pDS->exec("CREATE INDEX ix_path ON path ( strPath(255) )");
   m_pDS->exec("CREATE INDEX ix_path2 ON path ( idParentPath )");
@@ -4624,7 +4624,7 @@ bool CVideoDatabase::GetVideoSettings(int idFile, CVideoSettings &settings)
     if (NULL == m_pDS.get()) return false;
 
     std::string strSQL = PrepareSQL(
-        "select * from settings where settings.idFile = '%i' AND userID = '%i' ", idFile,
+        "select * from settings where settings.idFile = '%i' AND userID = '%s' ", idFile,
         CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_databaseVideo.userID);
     m_pDS->query( strSQL );
 
@@ -4694,7 +4694,7 @@ void CVideoDatabase::SetVideoSettings(int idFile, const CVideoSettings &setting)
     if (idFile < 0)
       return;
     std::string strSQL = PrepareSQL(
-        "select * from settings where idFile=%i AND userID = '%i' ", idFile,
+        "select * from settings where idFile=%i AND userID = '%s' ", idFile,
         CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_databaseVideo.userID);
     m_pDS->query( strSQL );
     if (m_pDS->num_rows() > 0)
@@ -4710,7 +4710,7 @@ void CVideoDatabase::SetVideoSettings(int idFile, const CVideoSettings &setting)
                        setting.m_Sharpness,setting.m_NoiseReduction,setting.m_CustomNonLinStretch,setting.m_PostProcess,setting.m_ScalingMethod);
       std::string strSQL2;
 
-      strSQL2=PrepareSQL("ResumeTime=%i,StereoMode=%i,StereoInvert=%i,VideoStream=%i,TonemapMethod=%i,TonemapParam=%f where idFile=%i AND userID = '%i' \n",
+      strSQL2=PrepareSQL("ResumeTime=%i,StereoMode=%i,StereoInvert=%i,VideoStream=%i,TonemapMethod=%i,TonemapParam=%f where idFile=%i AND userID = '%s' \n",
                          setting.m_ResumeTime, setting.m_StereoMode, setting.m_StereoInvert, setting.m_VideoStream,
 						  setting.m_ToneMapMethod, setting.m_ToneMapParam, idFile,
 						  CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_databaseVideo.userID);
@@ -4727,7 +4727,7 @@ void CVideoDatabase::SetVideoSettings(int idFile, const CVideoSettings &setting)
                 "ResumeTime,"
                 "Sharpness,NoiseReduction,NonLinStretch,PostProcess,ScalingMethod,StereoMode,StereoInvert,VideoStream,TonemapMethod,TonemapParam,Orientation,CenterMixLevel) "
               "VALUES ";
-      strSQL += PrepareSQL("(%i,%s,%i,%f,%f,%f,%i,%i,%f,%i,%f,%f,%f,%f,%f,%i,%f,%f,%i,%i,%i,%i,%i,%i,%i,%f,%i,%i)",
+      strSQL += PrepareSQL("(%i,%s,%i,%i,%f,%f,%f,%i,%i,%f,%i,%f,%f,%f,%f,%f,%i,%f,%f,%i,%i,%i,%i,%i,%i,%i,%f,%i,%i)",
 						idFile,CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_databaseVideo.userID, setting.m_InterlaceMethod,
 						setting.m_ViewMode, setting.m_CustomZoomAmount, setting.m_CustomPixelRatio, setting.m_CustomVerticalShift,
                         setting.m_AudioStream, setting.m_SubtitleStream, setting.m_SubtitleDelay, setting.m_SubtitleOn, setting.m_Brightness,
